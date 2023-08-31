@@ -24,15 +24,15 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            child: SizedBox(
-              height: MediaQuery.of(context).size.height,
-              child: const Center(
-                child: FlutterAhaAuthentication(
-                  projectName: 'Flutter Aha Authentication',
-                  projectLogoAsset: 'assets/images/sample_logo.png',
-                  openiamAzureLogin: true,
-                ),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height,
+            child: const Center(
+              child: FlutterAhaAuthentication(
+                projectName: 'Flutter Aha Authentication',
+                projectLogoAsset: 'assets/images/sample_logo.png',
+                enableAzureLogin: true,
+                azureLoginUrl: 'https://azure.microsoft.com',
+                googleLoginUrl: 'https://google.com',
               ),
             ),
           ),
