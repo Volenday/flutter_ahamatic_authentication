@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class FlutterAhaAuthentication extends StatefulWidget {
   final String projectName;
-  final String projectLogoAsset;
+  final String? projectLogoAsset;
   final bool enableAzureLogin;
-  final String? azureLoginUrl;
-  final String? googleLoginUrl;
+  final VoidCallback? onPressedAzureLogin;
+  final VoidCallback? onPressedGoogleLogin;
 
   const FlutterAhaAuthentication({
     Key? key,
-    required this.projectLogoAsset,
+    this.projectLogoAsset,
     required this.projectName,
     this.enableAzureLogin = false,
-    this.azureLoginUrl,
-    this.googleLoginUrl,
+    this.onPressedAzureLogin,
+    this.onPressedGoogleLogin,
   }) : super(key: key);
 
   @override
@@ -31,13 +30,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     });
   }
 
-  Future<void> launchUrlStart({required String url}) async {
-    if (!await launchUrl(Uri.parse(url),
-        mode: LaunchMode.externalApplication)) {
-      throw 'Could not launch $url';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height;
@@ -48,8 +40,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Image.asset(widget.projectLogoAsset,
-              width: width / 4, height: height / 6),
+          widget.projectLogoAsset == null
+              ? const SizedBox.shrink()
+              : Image.asset(widget.projectLogoAsset!,
+                  width: width / 4, height: height / 6),
           Container(
               margin: const EdgeInsets.only(top: 20),
               padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
@@ -151,16 +145,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                           name: 'Google',
                           assetImage:
                               'packages/flutter_ahamatic_authentication/assets/images/google.png',
-                          onPressed: () =>
-                              launchUrlStart(url: widget.googleLoginUrl!)),
+                          onPressed: widget.onPressedGoogleLogin ?? () {}),
                       const SizedBox(width: 20),
                       if (widget.enableAzureLogin)
                         _SignInAlternatives(
                           name: 'Azure',
                           assetImage:
                               'packages/flutter_ahamatic_authentication/assets/images/azure.png',
-                          onPressed: () =>
-                              launchUrlStart(url: widget.azureLoginUrl!),
+                          onPressed: widget.onPressedAzureLogin ?? () {},
                         ),
                     ],
                   )

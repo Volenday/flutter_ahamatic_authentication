@@ -34,10 +34,10 @@ class _MyAppState extends State<MyApp> {
             child: const Center(
               child: FlutterAhaAuthentication(
                 projectName: 'Flutter Aha Authentication', // project name
-                projectLogoAsset: 'assets/images/sample_logo.png', // project logo from your asset file
+                projectLogoAsset: 'assets/images/sample_logo.png', // optional, project logo from your asset file
                 enableAzureLogin: true, // optional
-                azureLoginUrl: 'https://azure.microsoft.com', // pass a String url
-                googleLoginUrl: 'https://google.com', // pass a String url
+                azureLoginUrl: () {}, // optional, pass a callback function
+                googleLoginUrl: () {} //  optional, pass a callback function
               ),
             ),
           ),

@@ -26,13 +26,15 @@ class _MyAppState extends State<MyApp> {
         body: SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height,
-            child: const Center(
+            child: Center(
               child: FlutterAhaAuthentication(
                 projectName: 'Flutter Aha Authentication',
                 projectLogoAsset: 'assets/images/sample_logo.png',
                 enableAzureLogin: true,
-                azureLoginUrl: 'https://azure.microsoft.com',
-                googleLoginUrl: 'https://google.com',
+                onPressedAzureLogin: () => print('Azure Login'),
+                onPressedGoogleLogin: () {
+                  print('Google Login');
+                },
               ),
             ),
           ),
