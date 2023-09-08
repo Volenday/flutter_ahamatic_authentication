@@ -35,6 +35,9 @@ class _MyAppState extends State<MyApp> {
                 onPressedGoogleLogin: () {
                   print('Google Login');
                 },
+                onSignIn: () {
+                  print('Sign In');
+                },
               ),
             ),
           ),
