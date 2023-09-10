@@ -31,10 +31,10 @@ class _MyAppState extends State<MyApp> {
                 projectName: 'Flutter Aha Authentication',
                 projectLogoAsset: 'assets/images/sample_logo.png',
                 enableAzureLogin: true,
-                onPressedAzureLogin: () => print('Azure Login'),
                 onPressedGoogleLogin: () {
                   print('Google Login');
                 },
+                onSignIn: () {},
               ),
             ),
           ),
