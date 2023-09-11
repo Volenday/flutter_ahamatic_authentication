@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,10 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final TextEditingController? pinController;
   final String? moduleName;
   bool isAzurePressed;
+  bool isConsent;
+  String consentMessage;
+  final VoidCallback? onAcceptConsent;
+  final VoidCallback? onDeclineConsent;
 
   FlutterAhaAuthentication({
     Key? key,
@@ -50,6 +55,10 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.pinController,
     this.moduleName,
     this.isAzurePressed = false,
+    this.isConsent = false,
+    this.consentMessage = '',
+    this.onAcceptConsent,
+    this.onDeclineConsent,
   }) : super(key: key);
 
   @override
@@ -172,6 +181,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
+    final themeColor = Theme.of(context).colorScheme;
 
     return Padding(
       padding:
@@ -202,24 +212,29 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 child: Column(
                   children: [
                     if (widget.isPINTextboxShowing) ...[
-                      TextFormField(
-                        controller: widget.pinController,
-                        onFieldSubmitted: _onPinSubmittedField,
-                        style: const TextStyle(fontSize: 20),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
+                      Column(
+                        children: [
+                          TextFormField(
+                            controller: widget.pinController,
+                            onFieldSubmitted: _onPinSubmittedField,
+                            style: const TextStyle(fontSize: 20),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            maxLength: 6,
+                            decoration: const InputDecoration(
+                              border: UnderlineInputBorder(),
+                              labelText: "Code",
+                            ),
+                            onSaved: (value) =>
+                                widget.pinController!.text = value!,
+                          ),
                         ],
-                        maxLength: 6,
-                        decoration: const InputDecoration(
-                          border: UnderlineInputBorder(),
-                          labelText: "Code",
-                        ),
-                        onSaved: (value) => widget.pinController!.text = value!,
                       ),
                       const SizedBox(height: 10),
                       _CustomOutlineButton(
-                        label: "Submit",
+                        label: "SUBMIT",
                         onPressed: widget.onCodeSubmit,
                         block: widget.isCodeSubmitBlock,
                         loading: widget.isCodeSubmitLoading,
@@ -233,117 +248,149 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                       )
                     ],
                     const SizedBox(height: 20),
-                    Text(
-                      widget.projectName,
-                      style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      child: TextFormField(
-                        controller: widget.usernameController,
-                        focusNode: _usernameFocusNode,
-                        validator: _validateUsername,
-                        onSaved: (value) =>
-                            widget.usernameController!.text = value!,
-                        onFieldSubmitted: _onUsernameSubmittedField,
-                        decoration: InputDecoration(
+                    if (!widget.isPINTextboxShowing) ...[
+                      Text(
+                        widget.projectName,
+                        style: const TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 50,
+                        child: TextFormField(
+                          controller: widget.usernameController,
+                          focusNode: _usernameFocusNode,
+                          validator: _validateUsername,
+                          onSaved: (value) =>
+                              widget.usernameController!.text = value!,
+                          onFieldSubmitted: _onUsernameSubmittedField,
+                          decoration: InputDecoration(
+                              contentPadding: EdgeInsets.zero,
+                              hintText: 'Username',
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              prefixIcon: const Icon(Icons.person)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 50,
+                        child: TextFormField(
+                          controller: widget.passwordController,
+                          focusNode: _passwordFocusNode,
+                          validator: _validatePassword,
+                          onSaved: (value) =>
+                              widget.passwordController!.text = value!,
+                          onFieldSubmitted: _onPasswordSubmittedField,
+                          decoration: InputDecoration(
                             contentPadding: EdgeInsets.zero,
-                            hintText: 'Username',
+                            hintText: 'Password',
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10)),
-                            prefixIcon: const Icon(Icons.person)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      child: TextFormField(
-                        controller: widget.passwordController,
-                        focusNode: _passwordFocusNode,
-                        validator: _validatePassword,
-                        onSaved: (value) =>
-                            widget.passwordController!.text = value!,
-                        onFieldSubmitted: _onPasswordSubmittedField,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.zero,
-                          hintText: 'Password',
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureText
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Colors.grey,
+                            prefixIcon: const Icon(Icons.lock),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureText
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Colors.grey,
+                              ),
+                              onPressed: _toggle,
                             ),
-                            onPressed: _toggle,
+                          ),
+                          obscureText: _obscureText,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        obscureText: _obscureText,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'Forgot Password?',
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 50,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: widget.onSignIn,
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xffDC7242),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(5))),
+                          child: const Text(
+                            'SIGN IN',
+                            style: TextStyle(fontSize: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'OR SIGN IN WITH',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: widget.onSignIn,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xffDC7242),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5))),
-                        child: const Text(
-                          'SIGN IN',
-                          style: TextStyle(fontSize: 20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'OR SIGN IN WITH',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _SignInAlternatives(
-                            name: 'Google',
-                            assetImage:
-                                'packages/flutter_ahamatic_authentication/assets/images/google.png',
-                            onPressed: widget.onPressedGoogleLogin ?? () {}),
-                        const SizedBox(width: 20),
-                        if (widget.enableAzureLogin)
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                           _SignInAlternatives(
-                            name: 'Azure',
-                            assetImage:
-                                'packages/flutter_ahamatic_authentication/assets/images/azure.png',
-                            onPressed: () => {
-                              setState(() {
-                                widget.isAzurePressed = true;
-                              }),
-                              _onPressedAzureLogin(),
-                            },
+                              name: 'Google',
+                              logoName: 'google',
+                              onPressed: widget.onPressedGoogleLogin ?? () {}),
+                          const SizedBox(width: 20),
+                          if (widget.enableAzureLogin)
+                            _SignInAlternatives(
+                              name: 'Azure',
+                              logoName: 'azure',
+                              onPressed: () => {
+                                setState(() {
+                                  widget.isAzurePressed = true;
+                                }),
+                                _onPressedAzureLogin(),
+                              },
+                            ),
+                        ],
+                      )
+                    ],
+                    if (widget.isConsent) ...[
+                      Column(
+                        children: [
+                          const Text('Abena Data',
+                              style: TextStyle(
+                                  fontSize: 24, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 20),
+                          Text(
+                            widget.consentMessage,
+                            style: const TextStyle(fontSize: 18),
                           ),
-                      ],
-                    )
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _CustomOutlineButton(
+                                label: "ACCEPT",
+                                onPressed: widget.onAcceptConsent,
+                                buttonBackgroundColor: themeColor.primary,
+                              ),
+                              const SizedBox(
+                                width: 20,
+                              ),
+                              _CustomOutlineButton(
+                                  label: "DECLINE",
+                                  onPressed: widget.onDeclineConsent,
+                                  buttonBackgroundColor: Colors.grey),
+                            ],
+                          )
+                        ],
+                      ),
+                    ]
                   ],
                 ),
               ))
@@ -408,13 +455,13 @@ class _ResendButton extends StatelessWidget {
 }
 
 class _SignInAlternatives extends StatelessWidget {
-  final String assetImage;
+  final String logoName;
   final String name;
   final VoidCallback onPressed;
 
   const _SignInAlternatives({
     Key? key,
-    required this.assetImage,
+    required this.logoName,
     required this.name,
     required this.onPressed,
   }) : super(key: key);
@@ -438,11 +485,10 @@ class _SignInAlternatives extends StatelessWidget {
             width: 60,
             height: 60,
             padding: const EdgeInsets.all(10),
-            child: Image(
-              image: AssetImage(assetImage),
-              width: 60,
-              height: 60,
-              fit: BoxFit.fill,
+            child: CachedNetworkImage(
+              imageUrl: "https://test.auth.ahamatic.com/images/$logoName.png",
+              placeholder: (context, url) => const CircularProgressIndicator(),
+              errorWidget: (context, url, error) => const Icon(Icons.error),
             ),
           ),
         ),
@@ -458,6 +504,7 @@ class _CustomOutlineButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool block;
   final bool loading;
+  final Color? buttonBackgroundColor;
 
   const _CustomOutlineButton({
     Key? key,
@@ -465,6 +512,7 @@ class _CustomOutlineButton extends StatelessWidget {
     required this.onPressed,
     this.block = false,
     this.loading = false,
+    this.buttonBackgroundColor = Colors.white,
   }) : super(key: key);
 
   @override
@@ -513,7 +561,7 @@ class _CustomOutlineButton extends StatelessWidget {
               return themeColor.primary;
             }
 
-            return Colors.white;
+            return buttonBackgroundColor!;
           },
         ),
       ),
@@ -538,6 +586,7 @@ class _CustomOutlineButton extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.w600,
               overflow: TextOverflow.ellipsis,
+              color: Colors.black,
             ),
           )
         ],
