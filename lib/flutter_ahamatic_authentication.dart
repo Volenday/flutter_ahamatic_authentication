@@ -5,6 +5,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String projectName;
   final String? projectLogoAsset;
   final bool enableAzureLogin;
+  final bool enableOpenIAMLogin;
   final VoidCallback? onPressedAzureLogin;
   final VoidCallback? onPressedGoogleLogin;
   final GlobalKey<FormState>? formKey;
@@ -39,6 +40,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
       this.enableAzureLogin = false,
       this.onPressedAzureLogin,
       this.onPressedGoogleLogin,
+      this.enableOpenIAMLogin = true,
       this.usernameController,
       this.passwordController,
       this.usernameFocusNode,
@@ -112,117 +114,128 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 key: widget.formKey,
                 child: Column(
                   children: [
-                    if (widget.isPINTextboxShowing) ...[
-                      TextFormField(
-                        controller: widget.pinController,
-                        onFieldSubmitted: widget.onPinSubmittedField,
-                        style: const TextStyle(fontSize: 20),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        maxLength: 6,
-                        decoration: const InputDecoration(
-                          border: UnderlineInputBorder(),
-                          labelText: "Code",
-                        ),
-                        validator: widget.otpValidator,
-                        onSaved: widget.onSavedOtp,
-                      ),
-                      const SizedBox(height: 10),
-                      _CustomOutlineButton(
-                        label: "Submit",
-                        onPressed: widget.onCodeSubmit,
-                        block: widget.block,
-                        loading: widget.loading,
-                        loadingText: widget.loadingText,
-                      ),
-                      const SizedBox(height: 5),
-                      _ResendButton(
-                        tryLogin: widget.onCodeSubmit,
-                        isResendAvailable: widget.isResendAvailable,
-                        onPressed: widget.onResendCode,
-                        resendCooldown: widget.resendCooldown,
-                      )
-                    ],
-                    const SizedBox(height: 20),
-                    Text(
-                      widget.projectName,
-                      style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      child: TextFormField(
-                        controller: widget.usernameController,
-                        focusNode: widget.usernameFocusNode,
-                        validator: widget.usernameValidator,
-                        onSaved: widget.onSavedUserName,
-                        onFieldSubmitted: widget.onUsernameSubmittedField,
-                        decoration: InputDecoration(
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Username',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            prefixIcon: const Icon(Icons.person)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      child: TextFormField(
-                        controller: widget.passwordController,
-                        focusNode: widget.passwordFocusNode,
-                        validator: widget.passwordValidator,
-                        onSaved: widget.onSavedPassword,
-                        onFieldSubmitted: widget.onPasswordSubmittedField,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.zero,
-                          hintText: 'Password',
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureText
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Colors.grey,
+                    if (widget.enableOpenIAMLogin)
+                      Column(
+                        children: [
+                          if (widget.isPINTextboxShowing) ...[
+                            TextFormField(
+                              controller: widget.pinController,
+                              onFieldSubmitted: widget.onPinSubmittedField,
+                              style: const TextStyle(fontSize: 20),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              maxLength: 6,
+                              decoration: const InputDecoration(
+                                border: UnderlineInputBorder(),
+                                labelText: "Code",
+                              ),
+                              validator: widget.otpValidator,
+                              onSaved: widget.onSavedOtp,
                             ),
-                            onPressed: _toggle,
-                          ),
-                        ),
-                        obscureText: _obscureText,
+                            const SizedBox(height: 10),
+                            _CustomOutlineButton(
+                              label: "Submit",
+                              onPressed: widget.onCodeSubmit,
+                              block: widget.block,
+                              loading: widget.loading,
+                              loadingText: widget.loadingText,
+                            ),
+                            const SizedBox(height: 5),
+                            _ResendButton(
+                              tryLogin: widget.onCodeSubmit,
+                              isResendAvailable: widget.isResendAvailable,
+                              onPressed: widget.onResendCode,
+                              resendCooldown: widget.resendCooldown,
+                            )
+                          ],
+                          const SizedBox(height: 20),
+                          if (!widget.isPINTextboxShowing) ...[
+                            Text(
+                              widget.projectName,
+                              style: const TextStyle(
+                                  fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 50,
+                              child: TextFormField(
+                                controller: widget.usernameController,
+                                focusNode: widget.usernameFocusNode,
+                                validator: widget.usernameValidator,
+                                onSaved: widget.onSavedUserName,
+                                onFieldSubmitted:
+                                    widget.onUsernameSubmittedField,
+                                decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.zero,
+                                    hintText: 'Username',
+                                    border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                    prefixIcon: const Icon(Icons.person)),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 50,
+                              child: TextFormField(
+                                controller: widget.passwordController,
+                                focusNode: widget.passwordFocusNode,
+                                validator: widget.passwordValidator,
+                                onSaved: widget.onSavedPassword,
+                                onFieldSubmitted:
+                                    widget.onPasswordSubmittedField,
+                                decoration: InputDecoration(
+                                  contentPadding: EdgeInsets.zero,
+                                  hintText: 'Password',
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  prefixIcon: const Icon(Icons.lock),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscureText
+                                          ? Icons.visibility
+                                          : Icons.visibility_off,
+                                      color: Colors.grey,
+                                    ),
+                                    onPressed: _toggle,
+                                  ),
+                                ),
+                                obscureText: _obscureText,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 50,
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: widget.onSignIn,
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xffDC7242),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(5))),
+                                child: const Text(
+                                  'SIGN IN',
+                                  style: TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'Forgot Password?',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 50,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: widget.onSignIn,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xffDC7242),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5))),
-                        child: const Text(
-                          'SIGN IN',
-                          style: TextStyle(fontSize: 20),
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 20),
                     const Text(
                       'OR SIGN IN WITH',
