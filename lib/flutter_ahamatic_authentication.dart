@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,7 +11,6 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String? projectLogoAsset;
   final bool enableAzureLogin;
   final bool isPINTextboxShowing;
-  final String? azureUrlLink;
   final VoidCallback? onPressedGoogleLogin;
   final VoidCallback onSignIn;
   final VoidCallback? onCodeSubmit;
@@ -25,6 +25,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final TextEditingController? usernameController;
   final TextEditingController? passwordController;
   final TextEditingController? pinController;
+  final String? moduleName;
+  bool isAzurePressed;
 
   FlutterAhaAuthentication({
     Key? key,
@@ -32,7 +34,6 @@ class FlutterAhaAuthentication extends StatefulWidget {
     required this.projectName,
     this.enableAzureLogin = false,
     this.isPINTextboxShowing = false,
-    this.azureUrlLink,
     this.onPressedGoogleLogin,
     required this.onSignIn,
     this.onCodeSubmit,
@@ -47,6 +48,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.usernameController,
     this.passwordController,
     this.pinController,
+    this.moduleName,
+    this.isAzurePressed = false,
   }) : super(key: key);
 
   @override
@@ -55,17 +58,69 @@ class FlutterAhaAuthentication extends StatefulWidget {
 }
 
 class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
+  final _dio = Dio();
   final FocusNode _usernameFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
   bool _obscureText = true;
 
+  String? getLoginUrlFromJson(Map<String, dynamic> jsonData) {
+    try {
+      final configurations = jsonData['Configurations'] as List<dynamic>;
+
+      for (final config in configurations) {
+        if (config['Key'] == 'AuthConfig') {
+          final authConfigList = config['Value'] as List<dynamic>;
+          final reducnAppConfig = authConfigList.firstWhere(
+            (item) => item['Module'] == widget.moduleName,
+            orElse: () => null,
+          );
+
+          if (reducnAppConfig != null) {
+            final openIamAuthAzureConfig =
+                reducnAppConfig['OpenIAmAuthAzureConfig'];
+            if (openIamAuthAzureConfig != null &&
+                openIamAuthAzureConfig is Map<String, dynamic>) {
+              final loginUrl = openIamAuthAzureConfig['loginUrl'] as String?;
+              return loginUrl;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Error retrieving loginUrl: $error');
+    }
+
+    return null;
+  }
+
+  Future<String?> fetchLoginUrl() async {
+    try {
+      final response = await _dio.get(
+          'https://test.api.ahamatic.com/marketplace/applications/validate/reducn');
+
+      if (response.statusCode == 200) {
+        final jsonData = response.data;
+
+        final loginUrl = getLoginUrlFromJson(jsonData);
+
+        return loginUrl;
+      } else {
+        debugPrint('Failed to fetch JSON data: ${response.statusCode}');
+        return null;
+      }
+    } catch (error) {
+      debugPrint('Error fetching JSON data: $error');
+      return null;
+    }
+  }
+
   Future<void> _onPressedAzureLogin() async {
-    final url = widget.azureUrlLink;
+    final loginUrl = await fetchLoginUrl();
 
     try {
-      if (!await launchUrl(Uri.parse(url!),
+      if (!await launchUrl(Uri.parse(loginUrl!),
           mode: LaunchMode.externalApplication)) {
-        throw 'Could not launch $url';
+        throw 'Could not launch $loginUrl';
       }
     } catch (e) {
       debugPrint(e.toString());
@@ -280,7 +335,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                             name: 'Azure',
                             assetImage:
                                 'packages/flutter_ahamatic_authentication/assets/images/azure.png',
-                            onPressed: _onPressedAzureLogin,
+                            onPressed: () => {
+                              setState(() {
+                                widget.isAzurePressed = true;
+                              }),
+                              _onPressedAzureLogin(),
+                            },
                           ),
                       ],
                     )
