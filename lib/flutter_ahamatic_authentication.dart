@@ -6,12 +6,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+enum LoginType {
+  azure,
+  mitId,
+}
+
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
   final String projectName;
   final String? projectLogoAsset;
   final bool enableAzureLogin;
-  final bool isPINTextboxShowing;
+  final bool enableMitIdLogin;
+  final bool enableGoogleLogin;
+  final bool isPinTextboxShowing;
   final VoidCallback? onPressedGoogleLogin;
   final VoidCallback onSignIn;
   final VoidCallback? onCodeSubmit;
@@ -21,7 +28,6 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final bool isResendCodeAvailable;
   final int? resendCodeCooldown;
   bool isRememberCreds;
-  final VoidCallback? loadUsernameAndPassword;
   final GlobalKey<FormState>? formKey;
   final TextEditingController? usernameController;
   final TextEditingController? passwordController;
@@ -38,7 +44,9 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.projectLogoAsset,
     required this.projectName,
     this.enableAzureLogin = false,
-    this.isPINTextboxShowing = false,
+    this.enableMitIdLogin = false,
+    this.enableGoogleLogin = false,
+    this.isPinTextboxShowing = false,
     this.onPressedGoogleLogin,
     required this.onSignIn,
     this.onCodeSubmit,
@@ -48,7 +56,6 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.isResendCodeAvailable = false,
     this.resendCodeCooldown,
     this.isRememberCreds = false,
-    this.loadUsernameAndPassword,
     this.formKey,
     this.usernameController,
     this.passwordController,
@@ -72,7 +79,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final FocusNode _passwordFocusNode = FocusNode();
   bool _obscureText = true;
 
-  String? getLoginUrlFromJson(Map<String, dynamic> jsonData) {
+  String? getAzureLoginUrlFromJson(Map<String, dynamic> jsonData) {
     try {
       final configurations = jsonData['Configurations'] as List<dynamic>;
 
@@ -102,15 +109,52 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     return null;
   }
 
-  Future<String?> fetchLoginUrl() async {
+  String? getMitIdLoginUrlFromJson(
+    Map<String, dynamic> jsonData,
+  ) {
+    try {
+      final configurations = jsonData['Configurations'] as List<dynamic>;
+
+      for (final config in configurations) {
+        if (config['Key'] == 'AuthConfig') {
+          final authConfigList = config['Value'] as List<dynamic>;
+          final reducnAppConfig = authConfigList.firstWhere(
+            (item) => item['Module'] == widget.moduleName,
+            orElse: () => null,
+          );
+
+          if (reducnAppConfig != null) {
+            final openIamAuthAzureConfig =
+                reducnAppConfig['OpenIAmAuthMitIdConfig'];
+            if (openIamAuthAzureConfig != null &&
+                openIamAuthAzureConfig is Map<String, dynamic>) {
+              final loginUrl = openIamAuthAzureConfig['loginUrl'] as String?;
+              return loginUrl;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Error retrieving loginUrl: $error');
+    }
+
+    return null;
+  }
+
+  Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
       final response = await _dio.get(
           'https://test.api.ahamatic.com/marketplace/applications/validate/reducn');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
+        String? loginUrl;
 
-        final loginUrl = getLoginUrlFromJson(jsonData);
+        if (loginType == LoginType.azure) {
+          loginUrl = getAzureLoginUrlFromJson(jsonData);
+        } else if (loginType == LoginType.mitId) {
+          loginUrl = getMitIdLoginUrlFromJson(jsonData);
+        }
 
         return loginUrl;
       } else {
@@ -124,7 +168,20 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Future<void> _onPressedAzureLogin() async {
-    final loginUrl = await fetchLoginUrl();
+    final loginUrl = await fetchLoginUrl(LoginType.azure);
+
+    try {
+      if (!await launchUrl(Uri.parse(loginUrl!),
+          mode: LaunchMode.externalApplication)) {
+        throw 'Could not launch $loginUrl';
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+  }
+
+  Future<void> _onPressedMitIdLogin() async {
+    final loginUrl = await fetchLoginUrl(LoginType.mitId);
 
     try {
       if (!await launchUrl(Uri.parse(loginUrl!),
@@ -211,7 +268,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 key: widget.formKey,
                 child: Column(
                   children: [
-                    if (widget.isPINTextboxShowing) ...[
+                    if (widget.isPinTextboxShowing && !widget.isConsent) ...[
                       Column(
                         children: [
                           TextFormField(
@@ -248,7 +305,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                       )
                     ],
                     const SizedBox(height: 20),
-                    if (!widget.isPINTextboxShowing) ...[
+                    if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
                       Text(
                         widget.projectName,
                         style: const TextStyle(
@@ -340,22 +397,25 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _SignInAlternatives(
-                              name: 'Google',
-                              logoName: 'google',
-                              onPressed: widget.onPressedGoogleLogin ?? () {}),
+                          if (widget.enableGoogleLogin)
+                            _SignInAlternatives(
+                                name: 'Google',
+                                logoName: 'google',
+                                onPressed:
+                                    widget.onPressedGoogleLogin ?? () {}),
                           const SizedBox(width: 20),
                           if (widget.enableAzureLogin)
                             _SignInAlternatives(
                               name: 'Azure',
                               logoName: 'azure',
-                              onPressed: () => {
-                                setState(() {
-                                  widget.isAzurePressed = true;
-                                }),
-                                _onPressedAzureLogin(),
-                              },
+                              onPressed: () => _onPressedAzureLogin(),
                             ),
+                          const SizedBox(width: 20),
+                          if (widget.enableMitIdLogin)
+                            _SignInAlternatives(
+                                name: 'MitId',
+                                logoName: 'mitId',
+                                onPressed: () => _onPressedMitIdLogin()),
                         ],
                       )
                     ],
@@ -375,10 +435,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _CustomOutlineButton(
-                                label: "ACCEPT",
-                                onPressed: widget.onAcceptConsent,
-                                buttonBackgroundColor: themeColor.primary,
-                              ),
+                                  label: "ACCEPT",
+                                  onPressed: widget.onAcceptConsent,
+                                  buttonBackgroundColor: themeColor.primary,
+                                  labelColor: Colors.white),
                               const SizedBox(
                                 width: 20,
                               ),
@@ -505,6 +565,7 @@ class _CustomOutlineButton extends StatelessWidget {
   final bool block;
   final bool loading;
   final Color? buttonBackgroundColor;
+  final Color? labelColor;
 
   const _CustomOutlineButton({
     Key? key,
@@ -513,6 +574,7 @@ class _CustomOutlineButton extends StatelessWidget {
     this.block = false,
     this.loading = false,
     this.buttonBackgroundColor = Colors.white,
+    this.labelColor,
   }) : super(key: key);
 
   @override
@@ -582,11 +644,11 @@ class _CustomOutlineButton extends StatelessWidget {
           Text(
             loading ? "Loading.." : label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               overflow: TextOverflow.ellipsis,
-              color: Colors.black,
+              color: labelColor,
             ),
           )
         ],
