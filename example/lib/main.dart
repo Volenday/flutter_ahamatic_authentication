@@ -60,7 +60,7 @@ class _MyAppState extends State<MyApp> {
         recipient = data["recipient"];
         _isPINTextboxShowing = true;
       });
-    } on DioException catch (err) {
+    } on DioError catch (err) {
       debugPrint(err.toString());
     }
   }
@@ -94,7 +94,7 @@ class _MyAppState extends State<MyApp> {
         user = User.fromJSON(data['account']);
         _isPINTextboxShowing = false;
       });
-    } on DioException catch (err) {
+    } on DioError catch (err) {
       debugPrint(err.toString());
     }
 
@@ -103,27 +103,6 @@ class _MyAppState extends State<MyApp> {
     _passwordController.text = "";
     _formKey.currentState!.reset();
     setState(() => _isPINTextboxShowing = false);
-  }
-
-  String? _validateOTP(String? value) {
-    // must be 6-digits
-    if (value == null) return null;
-    if (value.isEmpty || value.length < 6) {
-      return "Invalid Input";
-    }
-    return null;
-  }
-
-  String? _validateUsername(String? value) {
-    if (value == null) return null;
-    if (value.isEmpty) return "Invalid Input";
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null) return null;
-    if (value.isEmpty) return "Invalid Input";
-    return null;
   }
 
   @override
@@ -140,30 +119,17 @@ class _MyAppState extends State<MyApp> {
             height: MediaQuery.of(context).size.height,
             child: Center(
               child: FlutterAhaAuthentication(
-                projectName: 'Flutter Aha Authentication',
-                projectLogoAsset: 'assets/images/sample_logo.png',
-                enableAzureLogin: true,
-                onPressedAzureLogin: () => print('Azure Login'),
-                onPressedGoogleLogin: () {
-                  print('Google Login');
-                },
-                enableOpenIAMLogin: true,
-                usernameController:
-                    _usernameController, // enableOpenIAmLogin? _usernameController:null,
-                passwordController:
-                    _passwordController, // enableOpenIAmLogin? _passwordController:null,
-                pinController:
-                    _pinController, // enableOpenIAmLogin? _pinController:null,
-                otpValidator:
-                    _validateOTP, // enableOpenIAmLogin? _validateOTP:null,
-                usernameValidator:
-                    _validateUsername, // enableOpenIAmLogin? _validateUsername:null,
-                passwordValidator:
-                    _validatePassword, // enableOpenIAmLogin? _validatePassword:null,
-                onSignIn: _trySubmit,
-                onCodeSubmit: _trySubmitPIN,
-                isPINTextboxShowing: _isPINTextboxShowing,
                 formKey: _formKey,
+                moduleName: 'reducnApp',
+                projectName: 'REDUCN',
+                projectLogoAsset: 'assets/images/sample_logo.png',
+                pinController: _pinController,
+                usernameController: _usernameController,
+                passwordController: _passwordController,
+                enableAzureLogin: true,
+                onCodeSubmit: _trySubmitPIN,
+                onSignIn: _trySubmit,
+                isPinTextboxShowing: _isPINTextboxShowing,
               ),
             ),
           ),
