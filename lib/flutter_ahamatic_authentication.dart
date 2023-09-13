@@ -313,7 +313,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
-                        height: 50,
                         child: TextFormField(
                           controller: widget.usernameController,
                           focusNode: _usernameFocusNode,
@@ -322,16 +321,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               widget.usernameController!.text = value!,
                           onFieldSubmitted: _onUsernameSubmittedField,
                           decoration: InputDecoration(
-                              contentPadding: EdgeInsets.zero,
-                              hintText: 'Username',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              prefixIcon: const Icon(Icons.person)),
+                            contentPadding: EdgeInsets.zero,
+                            hintText: 'Username',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            prefixIcon: const Icon(Icons.person),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
-                        height: 50,
                         child: TextFormField(
                           controller: widget.passwordController,
                           focusNode: _passwordFocusNode,
@@ -386,13 +385,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        'OR SIGN IN WITH',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
+                      if (widget.enableAzureLogin ||
+                          widget.enableMitIdLogin ||
+                          widget.enableGoogleLogin)
+                        const Text(
+                          'OR SIGN IN WITH',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey),
+                        ),
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
