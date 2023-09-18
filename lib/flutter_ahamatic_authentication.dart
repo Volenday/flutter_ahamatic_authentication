@@ -239,6 +239,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     final themeColor = Theme.of(context).colorScheme;
+    bool isPhone = MediaQuery.of(context).size.width < 600;
 
     return Padding(
       padding:
@@ -250,9 +251,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               : Image.asset(widget.projectLogoAsset!,
                   width: width / 4, height: height / 6),
           Container(
-              margin: const EdgeInsets.only(top: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-              width: width * 0.5,
+              margin: EdgeInsets.only(top: isPhone ? 10 : 20),
+              padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 20 : 50, vertical: isPhone ? 8 : 20),
+              width: isPhone ? width * 0.9 : width * 0.5,
               decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.grey),
@@ -280,10 +282,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               FilteringTextInputFormatter.digitsOnly
                             ],
                             maxLength: 6,
-                            decoration: const InputDecoration(
-                              border: UnderlineInputBorder(),
-                              labelText: "Code",
-                            ),
+                            decoration: InputDecoration(
+                                border: const UnderlineInputBorder(),
+                                labelText: "Code",
+                                labelStyle:
+                                    TextStyle(fontSize: isPhone ? 16 : 18)),
                             onSaved: (value) =>
                                 widget.pinController!.text = value!,
                           ),
@@ -308,8 +311,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
                       Text(
                         widget.projectName,
-                        style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: isPhone ? 18 : 24,
+                            fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -323,9 +327,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                           decoration: InputDecoration(
                             contentPadding: EdgeInsets.zero,
                             hintText: 'Username',
+                            hintStyle: TextStyle(
+                              fontSize: isPhone ? 14 : 16,
+                            ),
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10)),
-                            prefixIcon: const Icon(Icons.person),
+                            prefixIcon:
+                                Icon(Icons.person, size: isPhone ? 20 : 25),
                           ),
                         ),
                       ),
@@ -341,15 +349,20 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                           decoration: InputDecoration(
                             contentPadding: EdgeInsets.zero,
                             hintText: 'Password',
+                            hintStyle: TextStyle(
+                              fontSize: isPhone ? 14 : 16,
+                            ),
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10)),
-                            prefixIcon: const Icon(Icons.lock),
+                            prefixIcon:
+                                Icon(Icons.lock, size: isPhone ? 20 : 25),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureText
                                     ? Icons.visibility
                                     : Icons.visibility_off,
                                 color: Colors.grey,
+                                size: isPhone ? 20 : 25,
                               ),
                               onPressed: _toggle,
                             ),
@@ -358,19 +371,19 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerRight,
                         child: Text(
                           'Forgot Password?',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: isPhone ? 14 : 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
-                        height: 50,
+                        height: isPhone ? 40 : 50,
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: widget.onSignIn,
@@ -378,9 +391,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               backgroundColor: const Color(0xffDC7242),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(5))),
-                          child: const Text(
+                          child: Text(
                             'SIGN IN',
-                            style: TextStyle(fontSize: 20),
+                            style: TextStyle(fontSize: isPhone ? 18 : 20),
                           ),
                         ),
                       ),
@@ -388,10 +401,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                       if (widget.enableAzureLogin ||
                           widget.enableMitIdLogin ||
                           widget.enableGoogleLogin)
-                        const Text(
+                        Text(
                           'OR SIGN IN WITH',
                           style: TextStyle(
-                              fontSize: 16,
+                              fontSize: isPhone ? 14 : 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.grey),
                         ),
@@ -424,13 +437,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     if (widget.isConsent) ...[
                       Column(
                         children: [
-                          const Text('Abena Data',
+                          Text('Abena Data',
                               style: TextStyle(
-                                  fontSize: 24, fontWeight: FontWeight.bold)),
+                                  fontSize: isPhone ? 18 : 24,
+                                  fontWeight: FontWeight.bold)),
                           const SizedBox(height: 20),
                           Text(
                             widget.consentMessage,
-                            style: const TextStyle(fontSize: 18),
+                            style: TextStyle(fontSize: isPhone ? 14 : 18),
                           ),
                           const SizedBox(height: 20),
                           Row(
@@ -478,12 +492,14 @@ class _ResendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeColor = Theme.of(context).colorScheme;
+    bool isPhone = MediaQuery.of(context).size.width < 600;
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Did not receive OTP?",
-          style: TextStyle(fontSize: 18),
+          style: TextStyle(fontSize: isPhone ? 14 : 18),
         ),
         isResendAvailable
             ? TextButton(
@@ -492,7 +508,7 @@ class _ResendButton extends StatelessWidget {
                   'Resend OTP',
                   style: TextStyle(
                     color: themeColor.primary,
-                    fontSize: 18,
+                    fontSize: isPhone ? 14 : 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -506,7 +522,7 @@ class _ResendButton extends StatelessWidget {
                   '00:${resendCooldown.toString().padLeft(2, '0')}',
                   style: TextStyle(
                     color: themeColor.primary,
-                    fontSize: 18,
+                    fontSize: isPhone ? 16 : 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -530,6 +546,8 @@ class _SignInAlternatives extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool isPhone = MediaQuery.of(context).size.width < 600;
+
     return Column(
       children: [
         ElevatedButton(
@@ -544,8 +562,8 @@ class _SignInAlternatives extends StatelessWidget {
             ),
           ),
           child: Container(
-            width: 60,
-            height: 60,
+            width: isPhone ? 50 : 60,
+            height: isPhone ? 50 : 60,
             padding: const EdgeInsets.all(10),
             child: CachedNetworkImage(
               imageUrl: "https://test.auth.ahamatic.com/images/$logoName.png",
@@ -555,7 +573,7 @@ class _SignInAlternatives extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Text(name),
+        Text(name, style: TextStyle(fontSize: isPhone ? 12 : 14)),
       ],
     );
   }
@@ -583,13 +601,16 @@ class _CustomOutlineButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeColor = Theme.of(context).colorScheme;
     const disabledAlpha = 100;
+    bool isPhone = MediaQuery.of(context).size.width < 600;
 
     return OutlinedButton(
       onPressed: !loading ? onPressed : null,
       style: ButtonStyle(
-        minimumSize: MaterialStateProperty.all<Size>(const Size(150, 40)),
+        minimumSize: MaterialStateProperty.all<Size>(
+            Size(isPhone ? 130 : 150, isPhone ? 30 : 40)),
         padding: MaterialStateProperty.all<EdgeInsets>(
-          const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+          EdgeInsets.symmetric(
+              vertical: isPhone ? 5 : 10, horizontal: isPhone ? 10 : 20),
         ),
         shape: MaterialStateProperty.all<RoundedRectangleBorder>(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -647,7 +668,7 @@ class _CustomOutlineButton extends StatelessWidget {
             loading ? "Loading.." : label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: isPhone ? 14 : 16,
               fontWeight: FontWeight.w600,
               overflow: TextOverflow.ellipsis,
               color: labelColor,
