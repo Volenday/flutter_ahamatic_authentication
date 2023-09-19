@@ -371,17 +371,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            fontSize: isPhone ? 14 : 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
                       SizedBox(
                         height: isPhone ? 40 : 50,
                         width: double.infinity,
