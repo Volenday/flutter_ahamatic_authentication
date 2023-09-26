@@ -121,7 +121,6 @@ class _MyAppState extends State<MyApp> {
               child: FlutterAhaAuthentication(
                 formKey: _formKey,
                 moduleName: 'reducnApp',
-                projectName: 'REDUCN',
                 projectLogoAsset: 'assets/images/sample_logo.png',
                 pinController: _pinController,
                 usernameController: _usernameController,
@@ -130,6 +129,8 @@ class _MyAppState extends State<MyApp> {
                 onCodeSubmit: _trySubmitPIN,
                 onSignIn: _trySubmit,
                 isPinTextboxShowing: _isPINTextboxShowing,
+                enableGoogleLogin: true,
+                enableMitIdLogin: true,
               ),
             ),
           ),

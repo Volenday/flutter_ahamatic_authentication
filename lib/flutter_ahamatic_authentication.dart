@@ -13,7 +13,6 @@ enum LoginType {
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
-  final String projectName;
   final String? projectLogoAsset;
   final bool enableAzureLogin;
   final bool enableMitIdLogin;
@@ -42,7 +41,6 @@ class FlutterAhaAuthentication extends StatefulWidget {
   FlutterAhaAuthentication({
     Key? key,
     this.projectLogoAsset,
-    required this.projectName,
     this.enableAzureLogin = false,
     this.enableMitIdLogin = false,
     this.enableGoogleLogin = false,
@@ -78,6 +76,32 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final FocusNode _usernameFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
   bool _obscureText = true;
+  String projectName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    fetchData();
+  }
+
+  Future<void> fetchData() async {
+    try {
+      final response = await _dio.get(
+          'https://test.api.ahamatic.com/marketplace/applications/validate/reducn');
+
+      if (response.statusCode == 200) {
+        final jsonData = response.data;
+        final name = jsonData['Name'];
+        setState(() {
+          projectName = name;
+        });
+      } else {
+        throw Exception('Failed to load data');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
 
   String? getAzureLoginUrlFromJson(Map<String, dynamic> jsonData) {
     try {
@@ -310,7 +334,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     const SizedBox(height: 20),
                     if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
                       Text(
-                        widget.projectName,
+                        projectName,
                         style: TextStyle(
                             fontSize: isPhone ? 18 : 24,
                             fontWeight: FontWeight.bold),
