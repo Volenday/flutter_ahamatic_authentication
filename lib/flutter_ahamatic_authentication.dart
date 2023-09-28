@@ -92,9 +92,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       if (response.statusCode == 200) {
         final jsonData = response.data;
         final name = jsonData['Name'];
-        setState(() {
-          projectName = name;
-        });
+        if (mounted) {
+          setState(() {
+            projectName = name;
+          });
+        }
       } else {
         throw Exception('Failed to load data');
       }
