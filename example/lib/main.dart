@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
-const environment = "sandbox";
+const environment = "production";
 const ahaAPI = {
   'development': 'https://dev.api.ahamatic.com',
   'sandbox': 'https://test.api.ahamatic.com',
@@ -119,19 +119,19 @@ class _MyAppState extends State<MyApp> {
             height: MediaQuery.of(context).size.height,
             child: Center(
               child: FlutterAhaAuthentication(
-                formKey: _formKey,
-                moduleName: 'reducnApp',
-                projectLogoAsset: 'assets/images/sample_logo.png',
-                pinController: _pinController,
-                usernameController: _usernameController,
-                passwordController: _passwordController,
-                enableAzureLogin: true,
-                onCodeSubmit: _trySubmitPIN,
-                onSignIn: _trySubmit,
-                isPinTextboxShowing: _isPINTextboxShowing,
-                enableGoogleLogin: true,
-                enableMitIdLogin: true,
-              ),
+                  formKey: _formKey,
+                  moduleName: 'reducnApp',
+                  projectLogoAsset: 'assets/images/sample_logo.png',
+                  pinController: _pinController,
+                  usernameController: _usernameController,
+                  passwordController: _passwordController,
+                  enableAzureLogin: true,
+                  onCodeSubmit: _trySubmitPIN,
+                  onSignIn: _trySubmit,
+                  isPinTextboxShowing: _isPINTextboxShowing,
+                  enableGoogleLogin: true,
+                  enableMitIdLogin: true,
+                  config: apiURL),
             ),
           ),
         ),

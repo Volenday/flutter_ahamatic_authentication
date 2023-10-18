@@ -37,6 +37,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   String consentMessage;
   final VoidCallback? onAcceptConsent;
   final VoidCallback? onDeclineConsent;
+  final String config;
 
   FlutterAhaAuthentication({
     Key? key,
@@ -64,6 +65,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.consentMessage = '',
     this.onAcceptConsent,
     this.onDeclineConsent,
+    required this.config,
   }) : super(key: key);
 
   @override
@@ -86,8 +88,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> fetchData() async {
     try {
-      final response = await _dio.get(
-          'https://test.api.ahamatic.com/marketplace/applications/validate/reducn');
+      final response = await _dio
+          .get('${widget.config}/marketplace/applications/validate/reducn');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -169,8 +171,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
-      final response = await _dio.get(
-          'https://test.api.ahamatic.com/marketplace/applications/validate/reducn');
+      final response = await _dio
+          .get('${widget.config}/marketplace/applications/validate/reducn');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -429,10 +431,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                         children: [
                           if (widget.enableGoogleLogin)
                             _SignInAlternatives(
-                                name: 'Google',
-                                logoName: 'google',
-                                onPressed:
-                                    widget.onPressedGoogleLogin ?? () {}),
+                              name: 'Google',
+                              logoName: 'google',
+                              onPressed: widget.onPressedGoogleLogin ?? () {},
+                            ),
                           const SizedBox(width: 20),
                           if (widget.enableAzureLogin)
                             _SignInAlternatives(
@@ -443,9 +445,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                           const SizedBox(width: 20),
                           if (widget.enableMitIdLogin)
                             _SignInAlternatives(
-                                name: 'MitId',
-                                logoName: 'mitId',
-                                onPressed: () => _onPressedMitIdLogin()),
+                              name: 'MitId',
+                              logoName: 'mitId',
+                              onPressed: () => _onPressedMitIdLogin(),
+                            ),
                         ],
                       )
                     ],
