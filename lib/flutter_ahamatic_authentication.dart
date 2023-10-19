@@ -38,6 +38,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final VoidCallback? onAcceptConsent;
   final VoidCallback? onDeclineConsent;
   final String config;
+  final String applicationCode;
 
   FlutterAhaAuthentication({
     Key? key,
@@ -66,6 +67,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.onAcceptConsent,
     this.onDeclineConsent,
     required this.config,
+    required this.applicationCode,
   }) : super(key: key);
 
   @override
@@ -88,8 +90,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> fetchData() async {
     try {
-      final response = await _dio
-          .get('${widget.config}/marketplace/applications/validate/reducn');
+      final response = await _dio.get(
+          '${widget.config}/marketplace/applications/validate/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -171,8 +173,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
-      final response = await _dio
-          .get('${widget.config}/marketplace/applications/validate/reducn');
+      final response = await _dio.get(
+          '${widget.config}/marketplace/applications/validate/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
