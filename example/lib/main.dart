@@ -131,7 +131,7 @@ class _MyAppState extends State<MyApp> {
                   isPinTextboxShowing: _isPINTextboxShowing,
                   enableGoogleLogin: true,
                   enableMitIdLogin: true,
-                  applicationCode: "reducn",
+                  applicationCode: 'abenadata',
                   config: apiURL),
             ),
           ),

@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-enum LoginType {
-  azure,
-  mitId,
-}
+enum LoginType { azure, mitId }
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
@@ -81,6 +82,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final FocusNode _passwordFocusNode = FocusNode();
   bool _obscureText = true;
   String projectName = '';
+  bool isLoading = true;
+  bool refreshTokenFound = false;
+  final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers = {
+    Factory(() => EagerGestureRecognizer())
+  };
 
   @override
   void initState() {
@@ -197,31 +203,95 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
   }
 
-  Future<void> _onPressedAzureLogin() async {
-    final loginUrl = await fetchLoginUrl(LoginType.azure);
+  Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
+    final WebViewController controller =
+        WebViewController.fromPlatformCreationParams(
+            const PlatformWebViewControllerCreationParams());
 
-    try {
-      if (!await launchUrl(Uri.parse(loginUrl!),
-          mode: LaunchMode.externalApplication)) {
-        throw 'Could not launch $loginUrl';
+    fetchLoginUrl(loginType).then((url) {
+      controller
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(const Color(0xFF002238))
+        ..setNavigationDelegate(NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) async {
+            Uri uri = Uri.parse(request.url);
+            if (uri.queryParameters.containsKey('refreshToken')) {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri).then((_) {
+                  Navigator.pop(context);
+                });
+              } else {
+                print(' could not launch $uri');
+              }
+
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ))
+        ..loadRequest(Uri.parse(url ?? ''));
+
+      if (url != null) {
+        AwesomeDialog(
+            context: context,
+            dialogType: DialogType.noHeader,
+            dismissOnTouchOutside: false,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            keyboardAware: false,
+            autoDismiss: true,
+            body: SizedBox(
+              height: MediaQuery.of(context).size.height,
+              child: Scaffold(
+                resizeToAvoidBottomInset: false,
+                body: SingleChildScrollView(
+                  child: ListBody(
+                    children: [
+                      SizedBox(
+                          height: MediaQuery.of(context).size.height,
+                          width: MediaQuery.of(context).size.width,
+                          child: WebViewWidget(
+                            controller: controller,
+                          ))
+                    ],
+                  ),
+                ),
+              ),
+            )).show();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to launch Azure login'),
+          ),
+        );
       }
-    } catch (e) {
-      debugPrint(e.toString());
-    }
+    });
   }
 
-  Future<void> _onPressedMitIdLogin() async {
-    final loginUrl = await fetchLoginUrl(LoginType.mitId);
+  // Future<void> _onPressedAzureLogin() async {
+  //   final loginUrl = await fetchLoginUrl(LoginType.azure);
 
-    try {
-      if (!await launchUrl(Uri.parse(loginUrl!),
-          mode: LaunchMode.externalApplication)) {
-        throw 'Could not launch $loginUrl';
-      }
-    } catch (e) {
-      debugPrint(e.toString());
-    }
-  }
+  //   try {
+  //     if (!await launchUrl(Uri.parse(loginUrl!),
+  //         mode: LaunchMode.inAppWebView)) {
+  //       throw 'Could not launch $loginUrl';
+  //     }
+  //   } catch (e) {
+  //     debugPrint(e.toString());
+  //   }
+  // }
+
+  // Future<void> _onPressedMitIdLogin() async {
+  //   final loginUrl = await fetchLoginUrl(LoginType.mitId);
+
+  //   try {
+  //     if (!await launchUrl(Uri.parse(loginUrl!),
+  //         mode: LaunchMode.inAppWebView)) {
+  //       throw 'Could not launch $loginUrl';
+  //     }
+  //   } catch (e) {
+  //     debugPrint(e.toString());
+  //   }
+  // }
 
   void _onUsernameSubmittedField(String? value) {
     widget.usernameController!.text = value!;
@@ -271,227 +341,223 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     final themeColor = Theme.of(context).colorScheme;
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SingleChildScrollView(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          widget.projectLogoAsset == null
-              ? const SizedBox.shrink()
-              : Image.asset(widget.projectLogoAsset!,
-                  width: width / 4, height: height / 6),
-          Container(
-              margin: EdgeInsets.only(top: isPhone ? 10 : 20),
-              padding: EdgeInsets.symmetric(
-                  horizontal: isPhone ? 20 : 50, vertical: isPhone ? 8 : 20),
-              width: isPhone ? width * 0.9 : width * 0.5,
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [
-                    BoxShadow(
-                        color: Colors.grey,
-                        offset: Offset(0, 1),
-                        blurRadius: 1,
-                        spreadRadius: 1)
-                  ]),
-              child: Form(
-                key: widget.formKey,
-                child: Column(
-                  children: [
-                    if (widget.isPinTextboxShowing && !widget.isConsent) ...[
-                      Column(
-                        children: [
-                          TextFormField(
-                            controller: widget.pinController,
-                            onFieldSubmitted: _onPinSubmittedField,
-                            style: const TextStyle(fontSize: 20),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
-                            ],
-                            maxLength: 6,
-                            decoration: InputDecoration(
-                                border: const UnderlineInputBorder(),
-                                labelText: "Code",
-                                labelStyle:
-                                    TextStyle(fontSize: isPhone ? 16 : 18)),
-                            onSaved: (value) =>
-                                widget.pinController!.text = value!,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      _CustomOutlineButton(
-                        label: "SUBMIT",
-                        onPressed: widget.onCodeSubmit,
-                        block: widget.isCodeSubmitBlock,
-                        loading: widget.isCodeSubmitLoading,
-                      ),
-                      const SizedBox(height: 5),
-                      _ResendButton(
-                        tryLogin: widget.onCodeSubmit,
-                        isResendAvailable: widget.isResendCodeAvailable,
-                        onPressed: widget.onResendCode,
-                        resendCooldown: widget.resendCodeCooldown,
-                      )
-                    ],
+    return SingleChildScrollView(
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        widget.projectLogoAsset == null
+            ? const SizedBox.shrink()
+            : Image.asset(widget.projectLogoAsset!,
+                width: width / 4, height: height / 6),
+        Container(
+            margin: EdgeInsets.only(top: isPhone ? 10 : 20),
+            padding: EdgeInsets.symmetric(
+                horizontal: isPhone ? 20 : 50, vertical: isPhone ? 8 : 20),
+            width: isPhone ? width * 0.9 : width * 0.5,
+            decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(
+                      color: Colors.grey,
+                      offset: Offset(0, 1),
+                      blurRadius: 1,
+                      spreadRadius: 1)
+                ]),
+            child: Form(
+              key: widget.formKey,
+              child: Column(
+                children: [
+                  if (widget.isPinTextboxShowing && !widget.isConsent) ...[
+                    Column(
+                      children: [
+                        TextFormField(
+                          controller: widget.pinController,
+                          onFieldSubmitted: _onPinSubmittedField,
+                          style: const TextStyle(fontSize: 20),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          maxLength: 6,
+                          decoration: InputDecoration(
+                              border: const UnderlineInputBorder(),
+                              labelText: "Code",
+                              labelStyle:
+                                  TextStyle(fontSize: isPhone ? 16 : 18)),
+                          onSaved: (value) =>
+                              widget.pinController!.text = value!,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _CustomOutlineButton(
+                      label: "SUBMIT",
+                      onPressed: widget.onCodeSubmit,
+                      block: widget.isCodeSubmitBlock,
+                      loading: widget.isCodeSubmitLoading,
+                    ),
+                    const SizedBox(height: 5),
+                    _ResendButton(
+                      tryLogin: widget.onCodeSubmit,
+                      isResendAvailable: widget.isResendCodeAvailable,
+                      onPressed: widget.onResendCode,
+                      resendCooldown: widget.resendCodeCooldown,
+                    )
+                  ],
+                  const SizedBox(height: 20),
+                  if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
+                    Text(
+                      projectName,
+                      style: TextStyle(
+                          fontSize: isPhone ? 18 : 24,
+                          fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 20),
-                    if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
+                    SizedBox(
+                      child: TextFormField(
+                        controller: widget.usernameController,
+                        focusNode: _usernameFocusNode,
+                        validator: _validateUsername,
+                        onSaved: (value) =>
+                            widget.usernameController!.text = value!,
+                        onFieldSubmitted: _onUsernameSubmittedField,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.zero,
+                          hintText: 'Username',
+                          hintStyle: TextStyle(
+                            fontSize: isPhone ? 14 : 16,
+                          ),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon:
+                              Icon(Icons.person, size: isPhone ? 20 : 25),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      child: TextFormField(
+                        controller: widget.passwordController,
+                        focusNode: _passwordFocusNode,
+                        validator: _validatePassword,
+                        onSaved: (value) =>
+                            widget.passwordController!.text = value!,
+                        onFieldSubmitted: _onPasswordSubmittedField,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.zero,
+                          hintText: 'Password',
+                          hintStyle: TextStyle(
+                            fontSize: isPhone ? 14 : 16,
+                          ),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          prefixIcon: Icon(Icons.lock, size: isPhone ? 20 : 25),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureText
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.grey,
+                              size: isPhone ? 20 : 25,
+                            ),
+                            onPressed: _toggle,
+                          ),
+                        ),
+                        obscureText: _obscureText,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: isPhone ? 40 : 50,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: widget.onSignIn,
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xffDC7242),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5))),
+                        child: Text(
+                          'SIGN IN',
+                          style: TextStyle(fontSize: isPhone ? 18 : 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    if (widget.enableAzureLogin ||
+                        widget.enableMitIdLogin ||
+                        widget.enableGoogleLogin)
                       Text(
-                        projectName,
+                        'OR SIGN IN WITH',
                         style: TextStyle(
-                            fontSize: isPhone ? 18 : 24,
-                            fontWeight: FontWeight.bold),
+                            fontSize: isPhone ? 14 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey),
                       ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        child: TextFormField(
-                          controller: widget.usernameController,
-                          focusNode: _usernameFocusNode,
-                          validator: _validateUsername,
-                          onSaved: (value) =>
-                              widget.usernameController!.text = value!,
-                          onFieldSubmitted: _onUsernameSubmittedField,
-                          decoration: InputDecoration(
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Username',
-                            hintStyle: TextStyle(
-                              fontSize: isPhone ? 14 : 16,
-                            ),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            prefixIcon:
-                                Icon(Icons.person, size: isPhone ? 20 : 25),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (widget.enableGoogleLogin)
+                          _SignInAlternatives(
+                            name: 'Google',
+                            logoName: 'google',
+                            onPressed: widget.onPressedGoogleLogin ?? () {},
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        child: TextFormField(
-                          controller: widget.passwordController,
-                          focusNode: _passwordFocusNode,
-                          validator: _validatePassword,
-                          onSaved: (value) =>
-                              widget.passwordController!.text = value!,
-                          onFieldSubmitted: _onPasswordSubmittedField,
-                          decoration: InputDecoration(
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Password',
-                            hintStyle: TextStyle(
-                              fontSize: isPhone ? 14 : 16,
-                            ),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            prefixIcon:
-                                Icon(Icons.lock, size: isPhone ? 20 : 25),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureText
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                                color: Colors.grey,
-                                size: isPhone ? 20 : 25,
-                              ),
-                              onPressed: _toggle,
-                            ),
-                          ),
-                          obscureText: _obscureText,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: isPhone ? 40 : 50,
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: widget.onSignIn,
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xffDC7242),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5))),
-                          child: Text(
-                            'SIGN IN',
-                            style: TextStyle(fontSize: isPhone ? 18 : 20),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      if (widget.enableAzureLogin ||
-                          widget.enableMitIdLogin ||
-                          widget.enableGoogleLogin)
-                        Text(
-                          'OR SIGN IN WITH',
-                          style: TextStyle(
-                              fontSize: isPhone ? 14 : 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey),
-                        ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (widget.enableGoogleLogin)
-                            _SignInAlternatives(
-                              name: 'Google',
-                              logoName: 'google',
-                              onPressed: widget.onPressedGoogleLogin ?? () {},
-                            ),
-                          const SizedBox(width: 20),
-                          if (widget.enableAzureLogin)
-                            _SignInAlternatives(
+                        const SizedBox(width: 20),
+                        if (widget.enableAzureLogin)
+                          _SignInAlternatives(
                               name: 'Azure',
                               logoName: 'azure',
-                              onPressed: () => _onPressedAzureLogin(),
-                            ),
-                          const SizedBox(width: 20),
-                          if (widget.enableMitIdLogin)
-                            _SignInAlternatives(
-                              name: 'MitId',
-                              logoName: 'mitId',
-                              onPressed: () => _onPressedMitIdLogin(),
-                            ),
-                        ],
-                      )
-                    ],
-                    if (widget.isConsent) ...[
-                      Column(
-                        children: [
-                          Text('Abena Data',
-                              style: TextStyle(
-                                  fontSize: isPhone ? 18 : 24,
-                                  fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 20),
-                          Text(
-                            widget.consentMessage,
-                            style: TextStyle(fontSize: isPhone ? 14 : 18),
+                              onPressed: () =>
+                                  _launchLogin(context, LoginType.azure)),
+                        const SizedBox(width: 20),
+                        if (widget.enableMitIdLogin)
+                          _SignInAlternatives(
+                            name: 'MitId',
+                            logoName: 'mitId',
+                            onPressed: () =>
+                                _launchLogin(context, LoginType.mitId),
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _CustomOutlineButton(
-                                  label: "ACCEPT",
-                                  onPressed: widget.onAcceptConsent,
-                                  buttonBackgroundColor: themeColor.primary,
-                                  labelColor: Colors.white),
-                              const SizedBox(
-                                width: 20,
-                              ),
-                              _CustomOutlineButton(
-                                  label: "DECLINE",
-                                  onPressed: widget.onDeclineConsent,
-                                  buttonBackgroundColor: Colors.grey),
-                            ],
-                          )
-                        ],
-                      ),
-                    ]
+                      ],
+                    )
                   ],
-                ),
-              ))
-        ]),
-      ),
+                  if (widget.isConsent) ...[
+                    Column(
+                      children: [
+                        Text('Abena Data',
+                            style: TextStyle(
+                                fontSize: isPhone ? 18 : 24,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 20),
+                        Text(
+                          widget.consentMessage,
+                          style: TextStyle(fontSize: isPhone ? 14 : 18),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _CustomOutlineButton(
+                                label: "ACCEPT",
+                                onPressed: widget.onAcceptConsent,
+                                buttonBackgroundColor: themeColor.primary,
+                                labelColor: Colors.white),
+                            const SizedBox(
+                              width: 20,
+                            ),
+                            _CustomOutlineButton(
+                                label: "DECLINE",
+                                onPressed: widget.onDeclineConsent,
+                                buttonBackgroundColor: Colors.grey),
+                          ],
+                        )
+                      ],
+                    ),
+                  ]
+                ],
+              ),
+            ))
+      ]),
     );
   }
 }
