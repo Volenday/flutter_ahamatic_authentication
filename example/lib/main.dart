@@ -3,14 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
-const environment = "production";
+const environment = "sandbox";
+
 const ahaAPI = {
   'development': 'https://dev.api.ahamatic.com',
   'sandbox': 'https://test.api.ahamatic.com',
-  // 'production': 'https://api.ahamatic.com',
   'production': 'https://api-eu.ahamatic.com'
 };
+
+const ahaPortal = {
+  "development": 'https://dev.auth.ahamatic.com',
+  "sandbox": 'https://test.auth.ahamatic.com',
+  "production": 'https://auth.ahamatic.com'
+};
+
 final apiURL = ahaAPI[environment] as String;
+final portalURL = ahaPortal[environment] as String;
 const apiKey = '5740ed00-f13b-11ec-b42f-3bd642eee790';
 final dio = Dio();
 
@@ -122,17 +130,9 @@ class _MyAppState extends State<MyApp> {
                   formKey: _formKey,
                   moduleName: 'reducnApp',
                   projectLogoAsset: 'assets/images/sample_logo.png',
-                  pinController: _pinController,
-                  usernameController: _usernameController,
-                  passwordController: _passwordController,
-                  enableAzureLogin: true,
-                  onCodeSubmit: _trySubmitPIN,
-                  onSignIn: _trySubmit,
-                  isPinTextboxShowing: _isPINTextboxShowing,
-                  enableGoogleLogin: true,
-                  enableMitIdLogin: true,
                   applicationCode: 'abenadata',
-                  config: apiURL),
+                  apiUrlConfig: apiURL,
+                  portalUrlConfig: portalURL),
             ),
           ),
         ),

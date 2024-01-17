@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -6,68 +7,32 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:collection/collection.dart';
 
-enum LoginType { azure, mitId }
+enum LoginType { azure, mitId, openIAM }
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
   final String? projectLogoAsset;
-  final bool enableAzureLogin;
-  final bool enableMitIdLogin;
   final bool enableGoogleLogin;
-  final bool isPinTextboxShowing;
   final VoidCallback? onPressedGoogleLogin;
-  final VoidCallback onSignIn;
-  final VoidCallback? onCodeSubmit;
-  final VoidCallback? onResendCode;
-  final bool isCodeSubmitBlock;
-  final bool isCodeSubmitLoading;
-  final bool isResendCodeAvailable;
-  final int? resendCodeCooldown;
-  bool isRememberCreds;
   final GlobalKey<FormState>? formKey;
-  final TextEditingController? usernameController;
-  final TextEditingController? passwordController;
-  final TextEditingController? pinController;
   final String? moduleName;
-  bool isAzurePressed;
-  bool isConsent;
-  String consentMessage;
-  final VoidCallback? onAcceptConsent;
-  final VoidCallback? onDeclineConsent;
-  final String config;
+  final String apiUrlConfig;
+  final String portalUrlConfig;
   final String applicationCode;
 
-  FlutterAhaAuthentication({
+  const FlutterAhaAuthentication({
     Key? key,
     this.projectLogoAsset,
-    this.enableAzureLogin = false,
-    this.enableMitIdLogin = false,
     this.enableGoogleLogin = false,
-    this.isPinTextboxShowing = false,
     this.onPressedGoogleLogin,
-    required this.onSignIn,
-    this.onCodeSubmit,
-    this.onResendCode,
-    this.isCodeSubmitBlock = false,
-    this.isCodeSubmitLoading = false,
-    this.isResendCodeAvailable = false,
-    this.resendCodeCooldown,
-    this.isRememberCreds = false,
     this.formKey,
-    this.usernameController,
-    this.passwordController,
-    this.pinController,
     this.moduleName,
-    this.isAzurePressed = false,
-    this.isConsent = false,
-    this.consentMessage = '',
-    this.onAcceptConsent,
-    this.onDeclineConsent,
-    required this.config,
+    required this.apiUrlConfig,
+    required this.portalUrlConfig,
     required this.applicationCode,
   }) : super(key: key);
 
@@ -78,12 +43,13 @@ class FlutterAhaAuthentication extends StatefulWidget {
 
 class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final _dio = Dio();
-  final FocusNode _usernameFocusNode = FocusNode();
-  final FocusNode _passwordFocusNode = FocusNode();
-  bool _obscureText = true;
   String projectName = '';
   bool isLoading = true;
   bool refreshTokenFound = false;
+  bool isAzureAuthEnabled = false;
+  bool isMitIdAuthEnabled = false;
+  bool isOpeniamEnabled = false;
+
   final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers = {
     Factory(() => EagerGestureRecognizer())
   };
@@ -97,11 +63,42 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Future<void> fetchData() async {
     try {
       final response = await _dio.get(
-          '${widget.config}/marketplace/applications/validate/${widget.applicationCode}');
+          '${widget.apiUrlConfig}/marketplace/applications/validate/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
+
+        List<dynamic> configurations = jsonData['Configurations'];
+
+        Map<String, dynamic>? authConfig;
+        for (var config in configurations) {
+          if (config['Key'] == 'AuthConfig') {
+            authConfig = config;
+            break;
+          }
+        }
+
+        if (authConfig != null && authConfig['Value'] is List<dynamic>) {
+          Map<String, dynamic>? moduleConfig;
+          for (var config in authConfig['Value']) {
+            if (config['Module'] == widget.moduleName) {
+              moduleConfig = config;
+              break;
+            }
+          }
+
+          isAzureAuthEnabled = moduleConfig != null &&
+              moduleConfig['Portal Authentication']['AzureAuth'] == true;
+
+          isMitIdAuthEnabled = moduleConfig != null &&
+              moduleConfig['Portal Authentication']['MitIdAuth'] == true;
+
+          isOpeniamEnabled = moduleConfig != null &&
+              moduleConfig['Portal Authentication']['OpenIAmAuth'] == true;
+        }
+
         final name = jsonData['Name'];
+
         if (mounted) {
           setState(() {
             projectName = name;
@@ -145,6 +142,44 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     return null;
   }
 
+  String? getOpenIAMLoginUrlFromJson(Map<String, dynamic> jsonData) {
+    try {
+      final bool isAndroid = Platform.isAndroid;
+
+      final configurations = jsonData['Configurations'] as List<dynamic>;
+
+      for (final config in configurations) {
+        if (config['Key'] == 'AuthConfig') {
+          final authConfigList = config['Value'] as List<dynamic>;
+          final moduleConfig = authConfigList.firstWhereOrNull(
+            (item) => item['Module'] == widget.moduleName,
+          );
+
+          if (moduleConfig != null) {
+            final sandboxEnv = widget.apiUrlConfig.contains('test') ||
+                widget.apiUrlConfig.contains('dev');
+            final openIamAuthConfig = sandboxEnv
+                ? moduleConfig['HostName'] + 'SandBox'
+                : moduleConfig['HostName'];
+
+            final scheme = isAndroid
+                ? 'app://$openIamAuthConfig'
+                : '$openIamAuthConfig://';
+
+            final loginUrl =
+                '${widget.portalUrlConfig}/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
+
+            return loginUrl;
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Error retrieving OpenIAM login URL: $error');
+    }
+
+    return null;
+  }
+
   String? getMitIdLoginUrlFromJson(
     Map<String, dynamic> jsonData,
   ) {
@@ -180,7 +215,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
       final response = await _dio.get(
-          '${widget.config}/marketplace/applications/validate/${widget.applicationCode}');
+          '${widget.apiUrlConfig}/marketplace/applications/validate/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -190,6 +225,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           loginUrl = getAzureLoginUrlFromJson(jsonData);
         } else if (loginType == LoginType.mitId) {
           loginUrl = getMitIdLoginUrlFromJson(jsonData);
+        } else if (loginType == LoginType.openIAM) {
+          loginUrl = getOpenIAMLoginUrlFromJson(jsonData);
         }
 
         return loginUrl;
@@ -211,7 +248,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     fetchLoginUrl(loginType).then((url) {
       controller
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0xFF002238))
         ..setNavigationDelegate(NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) async {
             Uri uri = Uri.parse(request.url);
@@ -233,104 +269,50 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
       if (url != null) {
         AwesomeDialog(
-            context: context,
-            dialogType: DialogType.noHeader,
-            dismissOnTouchOutside: false,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-            keyboardAware: false,
-            autoDismiss: true,
-            body: SizedBox(
-              height: MediaQuery.of(context).size.height,
-              child: Scaffold(
-                resizeToAvoidBottomInset: false,
-                body: SingleChildScrollView(
-                  child: ListBody(
-                    children: [
-                      SizedBox(
-                          height: MediaQuery.of(context).size.height,
-                          width: MediaQuery.of(context).size.width,
-                          child: WebViewWidget(
-                            controller: controller,
-                          ))
-                    ],
-                  ),
-                ),
-              ),
-            )).show();
+          context: context,
+          dialogType: DialogType.noHeader,
+          dismissOnTouchOutside: false,
+          padding: const EdgeInsets.only(bottom: 10),
+          keyboardAware: false,
+          autoDismiss: true,
+          btnCancel: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.red,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+          body: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.8,
+            width: MediaQuery.of(context).size.width,
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              body: FutureBuilder(
+                  future: Future.delayed(const Duration(seconds: 3)),
+                  builder: (BuildContext context, AsyncSnapshot snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    } else {
+                      return WebViewWidget(
+                        controller: controller,
+                      );
+                    }
+                  }),
+            ),
+          ),
+        ).show();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to launch Azure login'),
+          SnackBar(
+            content: Text('Failed to launch $loginType login'),
           ),
         );
       }
-    });
-  }
-
-  // Future<void> _onPressedAzureLogin() async {
-  //   final loginUrl = await fetchLoginUrl(LoginType.azure);
-
-  //   try {
-  //     if (!await launchUrl(Uri.parse(loginUrl!),
-  //         mode: LaunchMode.inAppWebView)) {
-  //       throw 'Could not launch $loginUrl';
-  //     }
-  //   } catch (e) {
-  //     debugPrint(e.toString());
-  //   }
-  // }
-
-  // Future<void> _onPressedMitIdLogin() async {
-  //   final loginUrl = await fetchLoginUrl(LoginType.mitId);
-
-  //   try {
-  //     if (!await launchUrl(Uri.parse(loginUrl!),
-  //         mode: LaunchMode.inAppWebView)) {
-  //       throw 'Could not launch $loginUrl';
-  //     }
-  //   } catch (e) {
-  //     debugPrint(e.toString());
-  //   }
-  // }
-
-  void _onUsernameSubmittedField(String? value) {
-    widget.usernameController!.text = value!;
-    FocusScope.of(context).requestFocus(_passwordFocusNode);
-  }
-
-  void _onPasswordSubmittedField(String? value) {
-    widget.passwordController!.text = value!;
-    widget.onSignIn();
-  }
-
-  void _onPinSubmittedField(String value) {
-    widget.pinController!.text = value;
-    widget.onCodeSubmit!();
-  }
-
-  String? _validateUsername(String? value) {
-    if (value == null) return null;
-
-    if (value.isEmpty) {
-      return 'Enter your username';
-    }
-
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null) return null;
-
-    if (value.isEmpty) {
-      return 'Enter your password';
-    }
-
-    return null;
-  }
-
-  void _toggle() {
-    setState(() {
-      _obscureText = !_obscureText;
     });
   }
 
@@ -338,7 +320,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
-    final themeColor = Theme.of(context).colorScheme;
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
     return SingleChildScrollView(
@@ -367,253 +348,49 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               key: widget.formKey,
               child: Column(
                 children: [
-                  if (widget.isPinTextboxShowing && !widget.isConsent) ...[
-                    Column(
-                      children: [
-                        TextFormField(
-                          controller: widget.pinController,
-                          onFieldSubmitted: _onPinSubmittedField,
-                          style: const TextStyle(fontSize: 20),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          maxLength: 6,
-                          decoration: InputDecoration(
-                              border: const UnderlineInputBorder(),
-                              labelText: "Code",
-                              labelStyle:
-                                  TextStyle(fontSize: isPhone ? 16 : 18)),
-                          onSaved: (value) =>
-                              widget.pinController!.text = value!,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _CustomOutlineButton(
-                      label: "SUBMIT",
-                      onPressed: widget.onCodeSubmit,
-                      block: widget.isCodeSubmitBlock,
-                      loading: widget.isCodeSubmitLoading,
-                    ),
-                    const SizedBox(height: 5),
-                    _ResendButton(
-                      tryLogin: widget.onCodeSubmit,
-                      isResendAvailable: widget.isResendCodeAvailable,
-                      onPressed: widget.onResendCode,
-                      resendCooldown: widget.resendCodeCooldown,
-                    )
-                  ],
                   const SizedBox(height: 20),
-                  if (!widget.isPinTextboxShowing && !widget.isConsent) ...[
-                    Text(
-                      projectName,
-                      style: TextStyle(
-                          fontSize: isPhone ? 18 : 24,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      child: TextFormField(
-                        controller: widget.usernameController,
-                        focusNode: _usernameFocusNode,
-                        validator: _validateUsername,
-                        onSaved: (value) =>
-                            widget.usernameController!.text = value!,
-                        onFieldSubmitted: _onUsernameSubmittedField,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.zero,
-                          hintText: 'Username',
-                          hintStyle: TextStyle(
-                            fontSize: isPhone ? 14 : 16,
-                          ),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon:
-                              Icon(Icons.person, size: isPhone ? 20 : 25),
+                  Text(
+                    projectName,
+                    style: TextStyle(
+                        fontSize: isPhone ? 18 : 24,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isOpeniamEnabled)
+                        _SignInAlternatives(
+                          name: 'OpenIAM',
+                          logoName: 'openIAm',
+                          onPressed: () =>
+                              _launchLogin(context, LoginType.openIAM),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      child: TextFormField(
-                        controller: widget.passwordController,
-                        focusNode: _passwordFocusNode,
-                        validator: _validatePassword,
-                        onSaved: (value) =>
-                            widget.passwordController!.text = value!,
-                        onFieldSubmitted: _onPasswordSubmittedField,
-                        decoration: InputDecoration(
-                          contentPadding: EdgeInsets.zero,
-                          hintText: 'Password',
-                          hintStyle: TextStyle(
-                            fontSize: isPhone ? 14 : 16,
-                          ),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          prefixIcon: Icon(Icons.lock, size: isPhone ? 20 : 25),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureText
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: Colors.grey,
-                              size: isPhone ? 20 : 25,
-                            ),
-                            onPressed: _toggle,
-                          ),
+                      if (widget.enableGoogleLogin)
+                        _SignInAlternatives(
+                          name: 'Google',
+                          logoName: 'google',
+                          onPressed: widget.onPressedGoogleLogin ?? () {},
                         ),
-                        obscureText: _obscureText,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: isPhone ? 40 : 50,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: widget.onSignIn,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xffDC7242),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(5))),
-                        child: Text(
-                          'SIGN IN',
-                          style: TextStyle(fontSize: isPhone ? 18 : 20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (widget.enableAzureLogin ||
-                        widget.enableMitIdLogin ||
-                        widget.enableGoogleLogin)
-                      Text(
-                        'OR SIGN IN WITH',
-                        style: TextStyle(
-                            fontSize: isPhone ? 14 : 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
-                      ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.enableGoogleLogin)
-                          _SignInAlternatives(
-                            name: 'Google',
-                            logoName: 'google',
-                            onPressed: widget.onPressedGoogleLogin ?? () {},
-                          ),
-                        const SizedBox(width: 20),
-                        if (widget.enableAzureLogin)
-                          _SignInAlternatives(
-                              name: 'Azure',
-                              logoName: 'azure',
-                              onPressed: () =>
-                                  _launchLogin(context, LoginType.azure)),
-                        const SizedBox(width: 20),
-                        if (widget.enableMitIdLogin)
-                          _SignInAlternatives(
-                            name: 'MitId',
-                            logoName: 'mitId',
+                      if (isAzureAuthEnabled)
+                        _SignInAlternatives(
+                            name: 'Azure',
+                            logoName: 'azure',
                             onPressed: () =>
-                                _launchLogin(context, LoginType.mitId),
-                          ),
-                      ],
-                    )
-                  ],
-                  if (widget.isConsent) ...[
-                    Column(
-                      children: [
-                        Text('Abena Data',
-                            style: TextStyle(
-                                fontSize: isPhone ? 18 : 24,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 20),
-                        Text(
-                          widget.consentMessage,
-                          style: TextStyle(fontSize: isPhone ? 14 : 18),
+                                _launchLogin(context, LoginType.azure)),
+                      if (isMitIdAuthEnabled)
+                        _SignInAlternatives(
+                          name: 'MitId',
+                          logoName: 'mitId',
+                          onPressed: () =>
+                              _launchLogin(context, LoginType.mitId),
                         ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _CustomOutlineButton(
-                                label: "ACCEPT",
-                                onPressed: widget.onAcceptConsent,
-                                buttonBackgroundColor: themeColor.primary,
-                                labelColor: Colors.white),
-                            const SizedBox(
-                              width: 20,
-                            ),
-                            _CustomOutlineButton(
-                                label: "DECLINE",
-                                onPressed: widget.onDeclineConsent,
-                                buttonBackgroundColor: Colors.grey),
-                          ],
-                        )
-                      ],
-                    ),
-                  ]
+                    ],
+                  )
                 ],
               ),
             ))
       ]),
-    );
-  }
-}
-
-class _ResendButton extends StatelessWidget {
-  final Function? tryLogin;
-  final bool isResendAvailable;
-  final VoidCallback? onPressed;
-  final int? resendCooldown;
-  const _ResendButton(
-      {Key? key,
-      required this.tryLogin,
-      required this.isResendAvailable,
-      required this.onPressed,
-      this.resendCooldown})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final themeColor = Theme.of(context).colorScheme;
-    bool isPhone = MediaQuery.of(context).size.width < 600;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        Text(
-          "Did not receive OTP?",
-          style: TextStyle(fontSize: isPhone ? 14 : 18),
-        ),
-        isResendAvailable
-            ? TextButton(
-                onPressed: onPressed,
-                child: Text(
-                  'Resend OTP',
-                  style: TextStyle(
-                    color: themeColor.primary,
-                    fontSize: isPhone ? 14 : 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              )
-            : Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 34,
-                ),
-                child: Text(
-                  '00:${resendCooldown.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    color: themeColor.primary,
-                    fontSize: isPhone ? 16 : 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-      ],
     );
   }
 }
@@ -661,107 +438,6 @@ class _SignInAlternatives extends StatelessWidget {
         const SizedBox(height: 10),
         Text(name, style: TextStyle(fontSize: isPhone ? 12 : 14)),
       ],
-    );
-  }
-}
-
-class _CustomOutlineButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final bool block;
-  final bool loading;
-  final Color? buttonBackgroundColor;
-  final Color? labelColor;
-
-  const _CustomOutlineButton({
-    Key? key,
-    required this.label,
-    required this.onPressed,
-    this.block = false,
-    this.loading = false,
-    this.buttonBackgroundColor = Colors.white,
-    this.labelColor,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final themeColor = Theme.of(context).colorScheme;
-    const disabledAlpha = 100;
-    bool isPhone = MediaQuery.of(context).size.width < 600;
-
-    return OutlinedButton(
-      onPressed: !loading ? onPressed : null,
-      style: ButtonStyle(
-        minimumSize: MaterialStateProperty.all<Size>(
-            Size(isPhone ? 130 : 150, isPhone ? 30 : 40)),
-        padding: MaterialStateProperty.all<EdgeInsets>(
-          EdgeInsets.symmetric(
-              vertical: isPhone ? 5 : 10, horizontal: isPhone ? 10 : 20),
-        ),
-        shape: MaterialStateProperty.all<RoundedRectangleBorder>(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        side: MaterialStateBorderSide.resolveWith(
-          (states) {
-            if (states.contains(MaterialState.disabled)) {
-              return BorderSide(
-                width: 1.5,
-                color: themeColor.primary.withAlpha(disabledAlpha),
-              );
-            }
-
-            return BorderSide(width: 1.5, color: themeColor.primary);
-          },
-        ),
-        foregroundColor: MaterialStateProperty.resolveWith(
-          (states) {
-            if (states.contains(MaterialState.pressed)) {
-              return themeColor.tertiary;
-            }
-
-            if (states.contains(MaterialState.disabled)) {
-              return themeColor.primary.withAlpha(disabledAlpha);
-            }
-
-            return themeColor.primary;
-          },
-        ),
-        backgroundColor: MaterialStateColor.resolveWith(
-          (states) {
-            if (states.contains(MaterialState.pressed)) {
-              return themeColor.primary;
-            }
-
-            return buttonBackgroundColor!;
-          },
-        ),
-      ),
-      child: Row(
-        mainAxisSize: block ? MainAxisSize.max : MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (loading) ...[
-            SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                color: themeColor.primary.withAlpha(disabledAlpha),
-              ),
-            ),
-            const SizedBox(width: 15),
-          ],
-          Text(
-            loading ? "Loading.." : label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: isPhone ? 14 : 16,
-              fontWeight: FontWeight.w600,
-              overflow: TextOverflow.ellipsis,
-              color: labelColor,
-            ),
-          )
-        ],
-      ),
     );
   }
 }
