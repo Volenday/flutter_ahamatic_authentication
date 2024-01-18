@@ -270,11 +270,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       if (url != null) {
         AwesomeDialog(
           context: context,
+          bodyHeaderDistance: 5,
           dialogType: DialogType.noHeader,
           dismissOnTouchOutside: false,
-          padding: const EdgeInsets.only(bottom: 10),
           keyboardAware: false,
           autoDismiss: true,
+          isDense: true,
           btnCancel: ElevatedButton(
             style: ElevatedButton.styleFrom(
               foregroundColor: Colors.white,
@@ -287,10 +288,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           ),
           body: SizedBox(
             height: MediaQuery.of(context).size.height * 0.8,
-            width: MediaQuery.of(context).size.width,
-            child: Scaffold(
-              resizeToAvoidBottomInset: false,
-              body: FutureBuilder(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: FutureBuilder(
                   future: Future.delayed(const Duration(seconds: 3)),
                   builder: (BuildContext context, AsyncSnapshot snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {

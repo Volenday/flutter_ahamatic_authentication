@@ -35,10 +35,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _pinController = TextEditingController();
-  bool _isPINTextboxShowing = false;
   String? openIAmAuthToken;
   String? openIAmCookie;
   String? recipient;
@@ -46,72 +42,6 @@ class _MyAppState extends State<MyApp> {
   String? token;
   String? refreshToken;
   User? user;
-
-  void _trySubmit() async {
-    final bool? isValid = _formKey.currentState?.validate();
-
-    if (isValid == null || !isValid) {
-      return;
-    }
-
-    String username = _usernameController.text;
-    String password = _passwordController.text;
-    try {
-      final String url = "$apiURL/api/auth/openIAmUsername";
-
-      final response = await dio.post(url,
-          data: {'apiKey': apiKey, "username": username, "password": password});
-      final data = response.data;
-      setState(() {
-        openIAmAuthToken = data["openIAmAuthToken"];
-        openIAmCookie = data["openIAmCookie"];
-        recipient = data["recipient"];
-        _isPINTextboxShowing = true;
-      });
-    } on DioError catch (err) {
-      debugPrint(err.toString());
-    }
-  }
-
-  void _trySubmitPIN() async {
-    final isValid = _formKey.currentState!.validate();
-    if (!isValid) {
-      return;
-    }
-    String pin = _pinController.text;
-    try {
-      final String url = '$apiURL/api/auth/openIAmUsername/verify';
-
-      final response = await dio.post(
-        url,
-        data: {
-          'apiKey': apiKey,
-          'code': pin,
-          'recipient': recipient,
-          'openIAmCookie': openIAmCookie,
-          'openIAmAuthToken': openIAmAuthToken,
-        },
-      );
-      final data = response.data;
-      debugPrint('token: ${data['token']}');
-      debugPrint('refresh-token: ${data['refreshToken']}');
-      debugPrint('user: ${data['account']['Username']}');
-      setState(() {
-        token = data['token'];
-        refreshToken = data['refreshToken'];
-        user = User.fromJSON(data['account']);
-        _isPINTextboxShowing = false;
-      });
-    } on DioError catch (err) {
-      debugPrint(err.toString());
-    }
-
-    _pinController.text = "";
-    _usernameController.text = "";
-    _passwordController.text = "";
-    _formKey.currentState!.reset();
-    setState(() => _isPINTextboxShowing = false);
-  }
 
   @override
   Widget build(BuildContext context) {
