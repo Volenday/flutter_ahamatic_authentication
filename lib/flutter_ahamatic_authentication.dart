@@ -276,6 +276,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           keyboardAware: false,
           autoDismiss: true,
           isDense: true,
+          headerAnimationLoop: false,
           btnCancel: ElevatedButton(
             style: ElevatedButton.styleFrom(
               foregroundColor: Colors.white,
