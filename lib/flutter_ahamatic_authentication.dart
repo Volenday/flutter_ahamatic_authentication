@@ -273,37 +273,46 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           bodyHeaderDistance: 5,
           dialogType: DialogType.noHeader,
           dismissOnTouchOutside: false,
-          keyboardAware: false,
           autoDismiss: true,
           isDense: true,
           headerAnimationLoop: false,
-          btnCancel: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.red,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          body: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.8,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: FutureBuilder(
-                  future: Future.delayed(const Duration(seconds: 3)),
-                  builder: (BuildContext context, AsyncSnapshot snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    } else {
-                      return WebViewWidget(
-                        controller: controller,
-                      );
-                    }
-                  }),
+          body: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    child: FutureBuilder(
+                        future: Future.delayed(const Duration(seconds: 3)),
+                        builder:
+                            (BuildContext context, AsyncSnapshot snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else {
+                            return WebViewWidget(
+                              controller: controller,
+                            );
+                          }
+                        })),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.2,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.red,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
             ),
           ),
         ).show();
@@ -323,7 +332,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     final width = MediaQuery.of(context).size.width;
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
-    return SingleChildScrollView(
+    return Center(
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         widget.projectLogoAsset == null
             ? const SizedBox.shrink()
