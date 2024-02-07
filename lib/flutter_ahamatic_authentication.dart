@@ -49,6 +49,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   bool isAzureAuthEnabled = false;
   bool isMitIdAuthEnabled = false;
   bool isOpeniamEnabled = false;
+  String azureLogo = '';
+  String mitIdLogo = '';
+  String openIAMLogo = '';
+  String openIAMTitle = '';
+  String azureTitle = '';
+  String mitIdTitle = '';
 
   final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers = {
     Factory(() => EagerGestureRecognizer())
@@ -95,6 +101,30 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
           isOpeniamEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['OpenIAmAuth'] == true;
+
+          openIAMLogo = moduleConfig != null && isOpeniamEnabled
+              ? moduleConfig['OpenIAMConfig']['logo']
+              : '';
+
+          openIAMTitle = moduleConfig != null && isOpeniamEnabled
+              ? moduleConfig['OpenIAMConfig']['title']
+              : '';
+
+          azureLogo = moduleConfig != null && isAzureAuthEnabled
+              ? moduleConfig['OpenIAmAuthAzureConfig']['logo']
+              : '';
+
+          azureTitle = moduleConfig != null && isAzureAuthEnabled
+              ? moduleConfig['OpenIAmAuthAzureConfig']['title']
+              : '';
+
+          mitIdLogo = moduleConfig != null && isMitIdAuthEnabled
+              ? moduleConfig['OpenIAmAuthMitIdConfig']['logo']
+              : '';
+
+          mitIdTitle = moduleConfig != null && isMitIdAuthEnabled
+              ? moduleConfig['OpenIAmAuthMitIdConfig']['title']
+              : '';
         }
 
         final name = jsonData['Name'];
@@ -168,6 +198,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
             final loginUrl =
                 '${widget.portalUrlConfig}/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
+
+            print('loginUrl: $loginUrl');
 
             return loginUrl;
           }
@@ -371,27 +403,27 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     children: [
                       if (isOpeniamEnabled)
                         _SignInAlternatives(
-                          name: 'OpenIAM',
-                          logoName: 'openIAm',
+                          name: openIAMTitle,
+                          logo: openIAMLogo,
                           onPressed: () =>
                               _launchLogin(context, LoginType.openIAM),
                         ),
                       if (widget.enableGoogleLogin)
                         _SignInAlternatives(
                           name: 'Google',
-                          logoName: 'google',
+                          logo: 'google',
                           onPressed: widget.onPressedGoogleLogin ?? () {},
                         ),
                       if (isAzureAuthEnabled)
                         _SignInAlternatives(
-                            name: 'Azure',
-                            logoName: 'azure',
+                            name: azureTitle,
+                            logo: azureLogo,
                             onPressed: () =>
                                 _launchLogin(context, LoginType.azure)),
                       if (isMitIdAuthEnabled)
                         _SignInAlternatives(
-                          name: 'MitId',
-                          logoName: 'mitId',
+                          name: mitIdTitle,
+                          logo: mitIdLogo,
                           onPressed: () =>
                               _launchLogin(context, LoginType.mitId),
                         ),
@@ -406,13 +438,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 }
 
 class _SignInAlternatives extends StatelessWidget {
-  final String logoName;
+  final String logo;
   final String name;
   final VoidCallback onPressed;
 
   const _SignInAlternatives({
     Key? key,
-    required this.logoName,
+    required this.logo,
     required this.name,
     required this.onPressed,
   }) : super(key: key);
@@ -439,7 +471,7 @@ class _SignInAlternatives extends StatelessWidget {
             height: isPhone ? 50 : 60,
             padding: const EdgeInsets.all(10),
             child: CachedNetworkImage(
-              imageUrl: "https://test.auth.ahamatic.com/images/$logoName.png",
+              imageUrl: logo,
               placeholder: (context, url) => const CircularProgressIndicator(),
               errorWidget: (context, url, error) => const Icon(Icons.error),
             ),

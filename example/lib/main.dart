@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
-const environment = "sandbox";
+const environment = "production";
 
 const ahaAPI = {
   'development': 'https://dev.api.ahamatic.com',
@@ -58,7 +58,7 @@ class _MyAppState extends State<MyApp> {
             child: Center(
               child: FlutterAhaAuthentication(
                   formKey: _formKey,
-                  moduleName: 'reducnApp',
+                  moduleName: 'b2bScanner',
                   projectLogoAsset: 'assets/images/sample_logo.png',
                   applicationCode: 'abenadata',
                   apiUrlConfig: apiURL,
