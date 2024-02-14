@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
-const environment = "production";
+const environment = "sandbox";
 
 const ahaAPI = {
   'development': 'https://dev.api.ahamatic.com',

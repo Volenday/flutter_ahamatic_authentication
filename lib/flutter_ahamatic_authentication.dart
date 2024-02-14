@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -138,7 +137,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         throw Exception('Failed to load data');
       }
     } catch (e) {
-      print('Error: $e');
+      debugPrint('Error: $e');
     }
   }
 
@@ -198,8 +197,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
             final loginUrl =
                 '${widget.portalUrlConfig}/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
-
-            print('loginUrl: $loginUrl');
 
             return loginUrl;
           }
@@ -273,64 +270,42 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
-    final WebViewController controller =
-        WebViewController.fromPlatformCreationParams(
-            const PlatformWebViewControllerCreationParams());
-
     fetchLoginUrl(loginType).then((url) {
-      controller
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(NavigationDelegate(
-          onNavigationRequest: (NavigationRequest request) async {
-            Uri uri = Uri.parse(request.url);
-            if (uri.queryParameters.containsKey('refreshToken')) {
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri).then((_) {
-                  Navigator.pop(context);
-                });
-              } else {
-                print(' could not launch $uri');
-              }
-
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ))
-        ..loadRequest(Uri.parse(url ?? ''));
-
-      if (url != null) {
-        AwesomeDialog(
+      showDialog(
           context: context,
-          bodyHeaderDistance: 5,
-          dialogType: DialogType.noHeader,
-          dismissOnTouchOutside: false,
-          autoDismiss: true,
-          isDense: true,
-          headerAnimationLoop: false,
-          body: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.8,
-                    child: FutureBuilder(
-                        future: Future.delayed(const Duration(seconds: 3)),
-                        builder:
-                            (BuildContext context, AsyncSnapshot snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          } else {
-                            return WebViewWidget(
-                              controller: controller,
-                            );
-                          }
-                        })),
-                const SizedBox(height: 10),
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              contentPadding: const EdgeInsets.fromLTRB(5, 10, 5, 0),
+              insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+              content: SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height * 0.9,
+                  child: WebView(
+                    initialUrl: url,
+                    javascriptMode: JavascriptMode.unrestricted,
+                    navigationDelegate: (NavigationRequest request) async {
+                      Uri uri = Uri.parse(request.url);
+                      if (uri.queryParameters.containsKey('refreshToken')) {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri).then((_) {
+                            Navigator.pop(context);
+                          });
+                        } else {
+                          debugPrint(' could not launch $uri');
+                        }
+
+                        return NavigationDecision.prevent;
+                      }
+                      return NavigationDecision.navigate;
+                    },
+                    onWebViewCreated: (webViewController) {
+                      webViewController.clearCache();
+                      final cookieManager = CookieManager();
+                      cookieManager.clearCookies();
+                    },
+                  )),
+              actions: <Widget>[
                 SizedBox(
                   width: MediaQuery.of(context).size.width * 0.2,
                   child: ElevatedButton(
@@ -345,16 +320,85 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ).show();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to launch $loginType login'),
-          ),
-        );
-      }
+            );
+          });
+      // controller
+      //   ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      //   ..setNavigationDelegate(NavigationDelegate(
+      //     onNavigationRequest: (NavigationRequest request) async {
+      //       Uri uri = Uri.parse(request.url);
+      //       if (uri.queryParameters.containsKey('refreshToken')) {
+      //         if (await canLaunchUrl(uri)) {
+      //           await launchUrl(uri).then((_) {
+      //             Navigator.pop(context);
+      //           });
+      //         } else {
+      //           print(' could not launch $uri');
+      //         }
+
+      //         return NavigationDecision.prevent;
+      //       }
+      //       return NavigationDecision.navigate;
+      //     },
+      //   ))
+      //   ..loadRequest(Uri.parse(url ?? ''));
+
+      // if (url != null) {
+      //   AwesomeDialog(
+      //     context: context,
+      //     bodyHeaderDistance: 5,
+      //     dialogType: DialogType.noHeader,
+      //     dismissOnTouchOutside: false,
+      //     autoDismiss: true,
+      //     isDense: true,
+      //     headerAnimationLoop: false,
+      //     body: Padding(
+      //       padding: const EdgeInsets.symmetric(vertical: 10),
+      //       child: Column(
+      //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      //         children: [
+      //           SizedBox(
+      //               height: MediaQuery.of(context).size.height * 0.8,
+      //               child: FutureBuilder(
+      //                   future: Future.delayed(const Duration(seconds: 3)),
+      //                   builder:
+      //                       (BuildContext context, AsyncSnapshot snapshot) {
+      //                     if (snapshot.connectionState ==
+      //                         ConnectionState.waiting) {
+      //                       return const Center(
+      //                         child: CircularProgressIndicator(),
+      //                       );
+      //                     } else {
+      //                       return WebViewWidget(
+      //                         controller: controller,
+      //                       );
+      //                     }
+      //                   })),
+      //           const SizedBox(height: 10),
+      //           SizedBox(
+      //             width: MediaQuery.of(context).size.width * 0.2,
+      //             child: ElevatedButton(
+      //               style: ElevatedButton.styleFrom(
+      //                 foregroundColor: Colors.white,
+      //                 backgroundColor: Colors.red,
+      //               ),
+      //               onPressed: () {
+      //                 Navigator.pop(context);
+      //               },
+      //               child: const Text('Cancel'),
+      //             ),
+      //           ),
+      //         ],
+      //       ),
+      //     ),
+      //   ).show();
+      // } else {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     SnackBar(
+      //       content: Text('Failed to launch $loginType login'),
+      //     ),
+      //   );
+      // }
     });
   }
 
