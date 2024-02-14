@@ -276,50 +276,55 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           barrierDismissible: false,
           builder: (BuildContext context) {
             return AlertDialog(
-              contentPadding: const EdgeInsets.fromLTRB(5, 10, 5, 0),
+              contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
               insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-              content: SizedBox(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height * 0.9,
-                  child: WebView(
-                    initialUrl: url,
-                    javascriptMode: JavascriptMode.unrestricted,
-                    navigationDelegate: (NavigationRequest request) async {
-                      Uri uri = Uri.parse(request.url);
-                      if (uri.queryParameters.containsKey('refreshToken')) {
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri).then((_) {
-                            Navigator.pop(context);
-                          });
-                        } else {
-                          debugPrint(' could not launch $uri');
-                        }
-
-                        return NavigationDecision.prevent;
-                      }
-                      return NavigationDecision.navigate;
-                    },
-                    onWebViewCreated: (webViewController) {
-                      webViewController.clearCache();
-                      final cookieManager = CookieManager();
-                      cookieManager.clearCookies();
-                    },
-                  )),
-              actions: <Widget>[
-                SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.2,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.red,
-                    ),
-                    onPressed: () {
+              content: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
                       Navigator.pop(context);
                     },
-                    child: const Text('Cancel'),
+                    child: const Align(
+                      alignment: Alignment.topRight,
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.red,
+                        size: 30,
+                        textDirection: TextDirection.rtl,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  Expanded(
+                      child: SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height * 0.9,
+                    child: WebView(
+                      initialUrl: url,
+                      javascriptMode: JavascriptMode.unrestricted,
+                      navigationDelegate: (NavigationRequest request) async {
+                        Uri uri = Uri.parse(request.url);
+                        if (uri.queryParameters.containsKey('refreshToken')) {
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri).then((_) {
+                              Navigator.pop(context);
+                            });
+                          } else {
+                            debugPrint(' could not launch $uri');
+                          }
+
+                          return NavigationDecision.prevent;
+                        }
+                        return NavigationDecision.navigate;
+                      },
+                      onWebViewCreated: (webViewController) {
+                        webViewController.clearCache();
+                        final cookieManager = CookieManager();
+                        cookieManager.clearCookies();
+                      },
+                    ),
+                  )),
+                ],
+              ),
             );
           });
       // controller
