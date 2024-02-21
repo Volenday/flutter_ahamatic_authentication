@@ -185,11 +185,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           );
 
           if (moduleConfig != null) {
-            final sandboxEnv = widget.apiUrlConfig.contains('test') ||
-                widget.apiUrlConfig.contains('dev');
-            final openIamAuthConfig = sandboxEnv
-                ? moduleConfig['HostName'] + 'SandBox'
-                : moduleConfig['HostName'];
+            final openIamAuthConfig = moduleConfig['HostName'];
 
             final scheme = isAndroid
                 ? 'app://$openIamAuthConfig'
