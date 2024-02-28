@@ -58,11 +58,11 @@ class _MyAppState extends State<MyApp> {
             child: Center(
               child: FlutterAhaAuthentication(
                   formKey: _formKey,
-                  moduleName: 'b2bScanner',
+                  moduleName: 'reducnApp',
                   projectLogoAsset: 'assets/images/sample_logo.png',
                   applicationCode: 'abenadata',
-                  apiUrlConfig: apiURL,
-                  portalUrlConfig: portalURL),
+                  environment: environment,
+                  europe: true),
             ),
           ),
         ),

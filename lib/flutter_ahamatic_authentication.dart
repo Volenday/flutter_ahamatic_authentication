@@ -19,9 +19,9 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final VoidCallback? onPressedGoogleLogin;
   final GlobalKey<FormState>? formKey;
   final String? moduleName;
-  final String apiUrlConfig;
-  final String portalUrlConfig;
   final String applicationCode;
+  final String environment;
+  final bool europe;
 
   const FlutterAhaAuthentication({
     Key? key,
@@ -30,9 +30,9 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.onPressedGoogleLogin,
     this.formKey,
     this.moduleName,
-    required this.apiUrlConfig,
-    required this.portalUrlConfig,
     required this.applicationCode,
+    required this.environment,
+    required this.europe,
   }) : super(key: key);
 
   @override
@@ -55,6 +55,26 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String azureTitle = '';
   String mitIdTitle = '';
 
+  late String env = widget.environment;
+
+  late final apiUrl = {
+    'development': 'https://dev.api.ahamatic.com',
+    'sandbox': 'https://test.api.ahamatic.com',
+    'production': 'https://api-eu.ahamatic.com'
+  }[env];
+
+  late final ahaPortal = widget.europe
+      ? {
+          'development': 'https://dev.auth-eu.ahamatic.com',
+          'sandbox': 'https://test.auth-eu.ahamatic.com',
+          'production': 'https://auth-eu.ahamatic.com'
+        }[env]
+      : {
+          'development': 'https://dev.auth.ahamatic.com',
+          'sandbox': 'https://test.auth.ahamatic.com',
+          'production': 'https://auth.ahamatic.com'
+        }[env];
+
   final Set<Factory<OneSequenceGestureRecognizer>> gestureRecognizers = {
     Factory(() => EagerGestureRecognizer())
   };
@@ -67,8 +87,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> fetchData() async {
     try {
-      final response = await _dio.get(
-          '${widget.apiUrlConfig}/api/validateApp/${widget.applicationCode}');
+      final response =
+          await _dio.get('$apiUrl/api/validateApp/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -192,7 +212,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 : '$openIamAuthConfig://';
 
             final loginUrl =
-                '${widget.portalUrlConfig}/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
+                '$ahaPortal/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
 
             return loginUrl;
           }
@@ -240,7 +260,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
       final response = await _dio.get(
-          '${widget.apiUrlConfig}/marketplace/applications/validate/${widget.applicationCode}');
+          '$apiUrl/marketplace/applications/validate/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -323,83 +343,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               ),
             );
           });
-      // controller
-      //   ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      //   ..setNavigationDelegate(NavigationDelegate(
-      //     onNavigationRequest: (NavigationRequest request) async {
-      //       Uri uri = Uri.parse(request.url);
-      //       if (uri.queryParameters.containsKey('refreshToken')) {
-      //         if (await canLaunchUrl(uri)) {
-      //           await launchUrl(uri).then((_) {
-      //             Navigator.pop(context);
-      //           });
-      //         } else {
-      //           print(' could not launch $uri');
-      //         }
-
-      //         return NavigationDecision.prevent;
-      //       }
-      //       return NavigationDecision.navigate;
-      //     },
-      //   ))
-      //   ..loadRequest(Uri.parse(url ?? ''));
-
-      // if (url != null) {
-      //   AwesomeDialog(
-      //     context: context,
-      //     bodyHeaderDistance: 5,
-      //     dialogType: DialogType.noHeader,
-      //     dismissOnTouchOutside: false,
-      //     autoDismiss: true,
-      //     isDense: true,
-      //     headerAnimationLoop: false,
-      //     body: Padding(
-      //       padding: const EdgeInsets.symmetric(vertical: 10),
-      //       child: Column(
-      //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      //         children: [
-      //           SizedBox(
-      //               height: MediaQuery.of(context).size.height * 0.8,
-      //               child: FutureBuilder(
-      //                   future: Future.delayed(const Duration(seconds: 3)),
-      //                   builder:
-      //                       (BuildContext context, AsyncSnapshot snapshot) {
-      //                     if (snapshot.connectionState ==
-      //                         ConnectionState.waiting) {
-      //                       return const Center(
-      //                         child: CircularProgressIndicator(),
-      //                       );
-      //                     } else {
-      //                       return WebViewWidget(
-      //                         controller: controller,
-      //                       );
-      //                     }
-      //                   })),
-      //           const SizedBox(height: 10),
-      //           SizedBox(
-      //             width: MediaQuery.of(context).size.width * 0.2,
-      //             child: ElevatedButton(
-      //               style: ElevatedButton.styleFrom(
-      //                 foregroundColor: Colors.white,
-      //                 backgroundColor: Colors.red,
-      //               ),
-      //               onPressed: () {
-      //                 Navigator.pop(context);
-      //               },
-      //               child: const Text('Cancel'),
-      //             ),
-      //           ),
-      //         ],
-      //       ),
-      //     ),
-      //   ).show();
-      // } else {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     SnackBar(
-      //       content: Text('Failed to launch $loginType login'),
-      //     ),
-      //   );
-      // }
     });
   }
 
