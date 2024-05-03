@@ -14,6 +14,7 @@ enum LoginType { azure, mitId, openIAM }
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
+  final String? projectName;
   final String? projectLogoAsset;
   final bool enableGoogleLogin;
   final VoidCallback? onPressedGoogleLogin;
@@ -25,6 +26,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
 
   const FlutterAhaAuthentication({
     Key? key,
+    this.projectName,
     this.projectLogoAsset,
     this.enableGoogleLogin = false,
     this.onPressedGoogleLogin,
@@ -42,8 +44,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
 
 class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final _dio = Dio();
-  String projectName = '';
-  bool isLoading = true;
+  String projectNameFromModule = '';
   bool refreshTokenFound = false;
   bool isAzureAuthEnabled = false;
   bool isMitIdAuthEnabled = false;
@@ -54,6 +55,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String openIAMTitle = '';
   String azureTitle = '';
   String mitIdTitle = '';
+  final _key = UniqueKey();
+  int progressEnded = 0;
 
   late String env = widget.environment;
 
@@ -150,7 +153,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
         if (mounted) {
           setState(() {
-            projectName = name;
+            projectNameFromModule = name;
           });
         }
       } else {
@@ -311,34 +314,50 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     ),
                   ),
                   Expanded(
-                      child: SizedBox(
-                    width: MediaQuery.of(context).size.width,
-                    height: MediaQuery.of(context).size.height * 0.9,
-                    child: WebView(
-                      initialUrl: url,
-                      javascriptMode: JavascriptMode.unrestricted,
-                      navigationDelegate: (NavigationRequest request) async {
-                        Uri uri = Uri.parse(request.url);
-                        if (uri.queryParameters.containsKey('refreshToken')) {
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri).then((_) {
-                              Navigator.pop(context);
-                            });
-                          } else {
-                            debugPrint(' could not launch $uri');
-                          }
+                    child: SizedBox(
+                        width: MediaQuery.of(context).size.width,
+                        height: MediaQuery.of(context).size.height * 0.9,
+                        child: Stack(
+                          children: [
+                            WebView(
+                              key: _key,
+                              backgroundColor: progressEnded != 100
+                                  ? const Color(0xFF003D7F)
+                                  : Colors.transparent,
+                              initialUrl: url,
+                              javascriptMode: JavascriptMode.unrestricted,
+                              navigationDelegate:
+                                  (NavigationRequest request) async {
+                                Uri uri = Uri.parse(request.url);
+                                if (uri.queryParameters
+                                    .containsKey('refreshToken')) {
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri).then((_) {
+                                      Navigator.pop(context);
+                                    });
+                                  } else {
+                                    debugPrint(' could not launch $uri');
+                                  }
 
-                          return NavigationDecision.prevent;
-                        }
-                        return NavigationDecision.navigate;
-                      },
-                      onWebViewCreated: (webViewController) {
-                        webViewController.clearCache();
-                        final cookieManager = CookieManager();
-                        cookieManager.clearCookies();
-                      },
-                    ),
-                  )),
+                                  return NavigationDecision.prevent;
+                                }
+                                return NavigationDecision.navigate;
+                              },
+                              onWebViewCreated: (webViewController) {
+                                webViewController.clearCache();
+                                final cookieManager = CookieManager();
+                                cookieManager.clearCookies();
+                              },
+                              gestureRecognizers: gestureRecognizers,
+                              onProgress: (int progress) {
+                                setState(() {
+                                  progressEnded = progress;
+                                });
+                              },
+                            ),
+                          ],
+                        )),
+                  ),
                 ],
               ),
             );
@@ -380,7 +399,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 children: [
                   const SizedBox(height: 20),
                   Text(
-                    projectName,
+                    widget.projectName ?? projectNameFromModule,
                     style: TextStyle(
                         fontSize: isPhone ? 18 : 24,
                         fontWeight: FontWeight.bold),
