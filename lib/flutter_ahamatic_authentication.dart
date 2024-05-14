@@ -297,6 +297,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             return AlertDialog(
               contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
               insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5)),
               content: Column(
                 children: [
                   GestureDetector(
