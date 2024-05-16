@@ -63,6 +63,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   int progressEnded = 0;
 
   late String env = widget.environment;
+  String url = html.window.location.href;
 
   late final apiUrl = {
     'development': 'https://dev.api.ahamatic.com',
@@ -246,8 +247,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           if (moduleConfig != null) {
             final openIamAuthConfig = moduleConfig['HostName'];
 
+            final port = url.substring(0, url.length - 1);
+
+            final callback =
+                url.contains('localhost') ? port : "https://$openIamAuthConfig";
+
             final loginUrl =
-                '$ahaPortal/client/${widget.applicationCode}?redirect=https://$openIamAuthConfig/callback?redirect=&origin=website&module=${widget.moduleWebName}';
+                '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
 
             return loginUrl;
           }
