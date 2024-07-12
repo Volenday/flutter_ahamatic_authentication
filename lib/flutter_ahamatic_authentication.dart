@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -23,6 +25,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String applicationCode;
   final String environment;
   final bool europe;
+  final String? moduleWebName;
 
   const FlutterAhaAuthentication({
     Key? key,
@@ -32,6 +35,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.onPressedGoogleLogin,
     this.formKey,
     this.moduleName,
+    this.moduleWebName,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -59,6 +63,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   int progressEnded = 0;
 
   late String env = widget.environment;
+  String url = html.window.location.href;
 
   late final apiUrl = {
     'development': 'https://dev.api.ahamatic.com',
@@ -228,6 +233,39 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     return null;
   }
 
+  String? getOpenIAMLoginForWeb(Map<String, dynamic> jsonData) {
+    try {
+      final configurations = jsonData['Configurations'] as List<dynamic>;
+
+      for (final config in configurations) {
+        if (config['Key'] == 'AuthConfig') {
+          final authConfigList = config['Value'] as List<dynamic>;
+          final moduleConfig = authConfigList.firstWhereOrNull(
+            (item) => item['Module'] == widget.moduleWebName,
+          );
+
+          if (moduleConfig != null) {
+            final openIamAuthConfig = moduleConfig['HostName'];
+
+            final port = url.substring(0, url.length - 1);
+
+            final callback =
+                url.contains('localhost') ? port : "https://$openIamAuthConfig";
+
+            final loginUrl =
+                '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
+
+            return loginUrl;
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Error retrieving OpenIAM login URL: $error');
+    }
+
+    return null;
+  }
+
   String? getMitIdLoginUrlFromJson(
     Map<String, dynamic> jsonData,
   ) {
@@ -274,7 +312,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         } else if (loginType == LoginType.mitId) {
           loginUrl = getMitIdLoginUrlFromJson(jsonData);
         } else if (loginType == LoginType.openIAM) {
-          loginUrl = getOpenIAMLoginUrlFromJson(jsonData);
+          loginUrl = kIsWeb
+              ? getOpenIAMLoginForWeb(jsonData)
+              : getOpenIAMLoginUrlFromJson(jsonData);
         }
 
         return loginUrl;
@@ -290,80 +330,82 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
     fetchLoginUrl(loginType).then((url) {
-      showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
-              insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5)),
-              content: Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Align(
-                      alignment: Alignment.topRight,
-                      child: Icon(
-                        Icons.close,
-                        color: Colors.red,
-                        size: 30,
-                        textDirection: TextDirection.rtl,
+      kIsWeb
+          ? html.window.open(url!, '_self')
+          : showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
+                  insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
+                  content: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                        },
+                        child: const Align(
+                          alignment: Alignment.topRight,
+                          child: Icon(
+                            Icons.close,
+                            color: Colors.red,
+                            size: 30,
+                            textDirection: TextDirection.rtl,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    child: SizedBox(
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height * 0.9,
-                        child: Stack(
-                          children: [
-                            WebView(
-                              key: _key,
-                              backgroundColor: progressEnded != 100
-                                  ? const Color(0xFF003D7F)
-                                  : Colors.transparent,
-                              initialUrl: url,
-                              javascriptMode: JavascriptMode.unrestricted,
-                              navigationDelegate:
-                                  (NavigationRequest request) async {
-                                Uri uri = Uri.parse(request.url);
-                                if (uri.queryParameters
-                                    .containsKey('refreshToken')) {
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri).then((_) {
-                                      Navigator.pop(context);
-                                    });
-                                  } else {
-                                    debugPrint(' could not launch $uri');
-                                  }
+                      Expanded(
+                        child: SizedBox(
+                            width: MediaQuery.of(context).size.width,
+                            height: MediaQuery.of(context).size.height * 0.9,
+                            child: Stack(
+                              children: [
+                                WebView(
+                                  key: _key,
+                                  backgroundColor: progressEnded != 100
+                                      ? const Color(0xFF003D7F)
+                                      : Colors.transparent,
+                                  initialUrl: url,
+                                  javascriptMode: JavascriptMode.unrestricted,
+                                  navigationDelegate:
+                                      (NavigationRequest request) async {
+                                    Uri uri = Uri.parse(request.url);
+                                    if (uri.queryParameters
+                                        .containsKey('refreshToken')) {
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri).then((_) {
+                                          Navigator.pop(context);
+                                        });
+                                      } else {
+                                        debugPrint(' could not launch $uri');
+                                      }
 
-                                  return NavigationDecision.prevent;
-                                }
-                                return NavigationDecision.navigate;
-                              },
-                              onWebViewCreated: (webViewController) {
-                                webViewController.clearCache();
-                                final cookieManager = CookieManager();
-                                cookieManager.clearCookies();
-                              },
-                              gestureRecognizers: gestureRecognizers,
-                              onProgress: (int progress) {
-                                setState(() {
-                                  progressEnded = progress;
-                                });
-                              },
-                            ),
-                          ],
-                        )),
+                                      return NavigationDecision.prevent;
+                                    }
+                                    return NavigationDecision.navigate;
+                                  },
+                                  onWebViewCreated: (webViewController) {
+                                    webViewController.clearCache();
+                                    final cookieManager = CookieManager();
+                                    cookieManager.clearCookies();
+                                  },
+                                  gestureRecognizers: gestureRecognizers,
+                                  onProgress: (int progress) {
+                                    setState(() {
+                                      progressEnded = progress;
+                                    });
+                                  },
+                                ),
+                              ],
+                            )),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          });
+                );
+              });
     });
   }
 
