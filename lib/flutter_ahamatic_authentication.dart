@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:collection/collection.dart';
+import 'package:universal_html/html.dart' as html;
 
 enum LoginType { azure, mitId, openIAM }
 
