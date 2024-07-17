@@ -22,6 +22,7 @@ final portalURL = ahaPortal[environment] as String;
 const apiKey = '5740ed00-f13b-11ec-b42f-3bd642eee790';
 final dio = Dio();
 
+Map<String, String>? initialQueryParameters;
 void main() {
   runApp(const MyApp());
 }
@@ -58,7 +59,8 @@ class _MyAppState extends State<MyApp> {
             child: Center(
               child: FlutterAhaAuthentication(
                   formKey: _formKey,
-                  moduleName: 'reducnApp',
+                  moduleName: 'b2bScanner',
+                  moduleWebName: 'b2bScannerWeb',
                   projectLogoAsset: 'assets/images/sample_logo.png',
                   applicationCode: 'abenadata',
                   environment: environment,
