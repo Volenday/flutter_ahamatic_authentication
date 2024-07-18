@@ -49,15 +49,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final _dio = Dio();
   String projectNameFromModule = '';
   bool refreshTokenFound = false;
-  bool isAzureAuthEnabled = false;
-  bool isMitIdAuthEnabled = false;
   bool isOpeniamEnabled = false;
-  String azureLogo = '';
-  String mitIdLogo = '';
   String openIAMLogo = '';
   String openIAMTitle = '';
-  String azureTitle = '';
-  String mitIdTitle = '';
   final _key = UniqueKey();
   int progressEnded = 0;
 
@@ -119,12 +113,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             }
           }
 
-          isAzureAuthEnabled = moduleConfig != null &&
-              moduleConfig['Portal Authentication']['AzureAuth'] == true;
-
-          isMitIdAuthEnabled = moduleConfig != null &&
-              moduleConfig['Portal Authentication']['MitIdAuth'] == true;
-
           isOpeniamEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['OpenIAmAuth'] == true;
 
@@ -134,22 +122,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
           openIAMTitle = moduleConfig != null && isOpeniamEnabled
               ? moduleConfig['OpenIAMConfig']['title']
-              : '';
-
-          azureLogo = moduleConfig != null && isAzureAuthEnabled
-              ? moduleConfig['OpenIAmAuthAzureConfig']['logo']
-              : '';
-
-          azureTitle = moduleConfig != null && isAzureAuthEnabled
-              ? moduleConfig['OpenIAmAuthAzureConfig']['title']
-              : '';
-
-          mitIdLogo = moduleConfig != null && isMitIdAuthEnabled
-              ? moduleConfig['OpenIAmAuthMitIdConfig']['logo']
-              : '';
-
-          mitIdTitle = moduleConfig != null && isMitIdAuthEnabled
-              ? moduleConfig['OpenIAmAuthMitIdConfig']['title']
               : '';
         }
 
@@ -166,36 +138,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     } catch (e) {
       debugPrint('Error: $e');
     }
-  }
-
-  String? getAzureLoginUrlFromJson(Map<String, dynamic> jsonData) {
-    try {
-      final configurations = jsonData['Configurations'] as List<dynamic>;
-
-      for (final config in configurations) {
-        if (config['Key'] == 'AuthConfig') {
-          final authConfigList = config['Value'] as List<dynamic>;
-          final reducnAppConfig = authConfigList.firstWhere(
-            (item) => item['Module'] == widget.moduleName,
-            orElse: () => null,
-          );
-
-          if (reducnAppConfig != null) {
-            final openIamAuthAzureConfig =
-                reducnAppConfig['OpenIAmAuthAzureConfig'];
-            if (openIamAuthAzureConfig != null &&
-                openIamAuthAzureConfig is Map<String, dynamic>) {
-              final loginUrl = openIamAuthAzureConfig['loginUrl'] as String?;
-              return loginUrl;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      debugPrint('Error retrieving loginUrl: $error');
-    }
-
-    return null;
   }
 
   String? getOpenIAMLoginUrlFromJson(Map<String, dynamic> jsonData) {
@@ -265,38 +207,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     return null;
   }
 
-  String? getMitIdLoginUrlFromJson(
-    Map<String, dynamic> jsonData,
-  ) {
-    try {
-      final configurations = jsonData['Configurations'] as List<dynamic>;
-
-      for (final config in configurations) {
-        if (config['Key'] == 'AuthConfig') {
-          final authConfigList = config['Value'] as List<dynamic>;
-          final reducnAppConfig = authConfigList.firstWhere(
-            (item) => item['Module'] == widget.moduleName,
-            orElse: () => null,
-          );
-
-          if (reducnAppConfig != null) {
-            final openIamAuthAzureConfig =
-                reducnAppConfig['OpenIAmAuthMitIdConfig'];
-            if (openIamAuthAzureConfig != null &&
-                openIamAuthAzureConfig is Map<String, dynamic>) {
-              final loginUrl = openIamAuthAzureConfig['loginUrl'] as String?;
-              return loginUrl;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      debugPrint('Error retrieving loginUrl: $error');
-    }
-
-    return null;
-  }
-
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
       final response = await _dio.get(
@@ -306,11 +216,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         final jsonData = response.data;
         String? loginUrl;
 
-        if (loginType == LoginType.azure) {
-          loginUrl = getAzureLoginUrlFromJson(jsonData);
-        } else if (loginType == LoginType.mitId) {
-          loginUrl = getMitIdLoginUrlFromJson(jsonData);
-        } else if (loginType == LoginType.openIAM) {
+        if (loginType == LoginType.openIAM) {
           loginUrl = kIsWeb
               ? getOpenIAMLoginForWeb(jsonData)
               : getOpenIAMLoginUrlFromJson(jsonData);
@@ -372,6 +278,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                   navigationDelegate:
                                       (NavigationRequest request) async {
                                     Uri uri = Uri.parse(request.url);
+
                                     if (uri.queryParameters
                                         .containsKey('refreshToken')) {
                                       if (await canLaunchUrl(uri)) {
@@ -463,19 +370,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                           name: 'Google',
                           logo: 'google',
                           onPressed: widget.onPressedGoogleLogin ?? () {},
-                        ),
-                      if (isAzureAuthEnabled)
-                        _SignInAlternatives(
-                            name: azureTitle,
-                            logo: azureLogo,
-                            onPressed: () =>
-                                _launchLogin(context, LoginType.azure)),
-                      if (isMitIdAuthEnabled)
-                        _SignInAlternatives(
-                          name: mitIdTitle,
-                          logo: mitIdLogo,
-                          onPressed: () =>
-                              _launchLogin(context, LoginType.mitId),
                         ),
                     ],
                   )
