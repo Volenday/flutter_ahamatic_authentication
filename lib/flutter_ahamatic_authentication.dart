@@ -188,10 +188,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           if (moduleConfig != null) {
             final openIamAuthConfig = moduleConfig['HostName'];
 
-            final port = url.substring(0, url.length - 1);
+            final uri = Uri.parse(url);
+            final baseUrl = '${uri.scheme}://${uri.host}:${uri.port}';
 
-            final callback =
-                url.contains('localhost') ? port : "https://$openIamAuthConfig";
+            final callback = url.contains('localhost')
+                ? baseUrl
+                : "https://$openIamAuthConfig";
 
             final loginUrl =
                 '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
