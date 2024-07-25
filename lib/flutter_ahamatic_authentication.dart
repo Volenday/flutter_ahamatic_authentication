@@ -15,6 +15,7 @@ enum LoginType { azure, mitId, openIAM }
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
+  final bool? isLoginButtonOnly;
   final String? projectName;
   final String? projectLogoAsset;
   final bool enableGoogleLogin;
@@ -28,6 +29,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
 
   const FlutterAhaAuthentication({
     Key? key,
+    this.isLoginButtonOnly,
     this.projectName,
     this.projectLogoAsset,
     this.enableGoogleLogin = false,
@@ -237,6 +239,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
     fetchLoginUrl(loginType).then((url) {
+      if (!context.mounted) return;
       kIsWeb
           ? html.window.open(url!, '_self')
           : showDialog(
@@ -285,6 +288,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                         .containsKey('refreshToken')) {
                                       if (await canLaunchUrl(uri)) {
                                         await launchUrl(uri).then((_) {
+                                          if (!context.mounted) return;
                                           Navigator.pop(context);
                                         });
                                       } else {
@@ -323,62 +327,89 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     final width = MediaQuery.of(context).size.width;
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
-    return Center(
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        widget.projectLogoAsset == null
-            ? const SizedBox.shrink()
-            : Image.asset(widget.projectLogoAsset!,
-                width: width / 4, height: height / 6),
-        Container(
-            margin: EdgeInsets.only(top: isPhone ? 10 : 20),
-            padding: EdgeInsets.symmetric(
-                horizontal: isPhone ? 20 : 50, vertical: isPhone ? 8 : 20),
-            width: isPhone ? width * 0.9 : width * 0.5,
-            decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.grey,
-                      offset: Offset(0, 1),
-                      blurRadius: 1,
-                      spreadRadius: 1)
-                ]),
-            child: Form(
-              key: widget.formKey,
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Text(
-                    widget.projectName ?? projectNameFromModule,
-                    style: TextStyle(
-                        fontSize: isPhone ? 18 : 24,
-                        fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (isOpeniamEnabled)
-                        _SignInAlternatives(
-                          name: openIAMTitle,
-                          logo: openIAMLogo,
-                          onPressed: () =>
-                              _launchLogin(context, LoginType.openIAM),
-                        ),
-                      if (widget.enableGoogleLogin)
-                        _SignInAlternatives(
-                          name: 'Google',
-                          logo: 'google',
-                          onPressed: widget.onPressedGoogleLogin ?? () {},
-                        ),
-                    ],
-                  )
-                ],
+    final bool isLoginButtonOnly = widget.isLoginButtonOnly ?? false;
+
+    return SizedBox(
+      child: isLoginButtonOnly
+          ? ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                    horizontal: isPhone ? 25 : 40, vertical: isPhone ? 4 : 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
               ),
-            ))
-      ]),
+              onPressed: () {
+                _launchLogin(context, LoginType.openIAM);
+              },
+              child: Text('Log in',
+                  style: TextStyle(
+                    color: const Color(0xFF173A78),
+                    fontSize: isPhone ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                  )),
+            )
+          : Center(
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    widget.projectLogoAsset == null
+                        ? const SizedBox.shrink()
+                        : Image.asset(widget.projectLogoAsset!,
+                            width: width / 4, height: height / 6),
+                    Container(
+                        margin: EdgeInsets.only(top: isPhone ? 10 : 20),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isPhone ? 20 : 50,
+                            vertical: isPhone ? 8 : 20),
+                        width: isPhone ? width * 0.9 : width * 0.5,
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.grey,
+                                  offset: Offset(0, 1),
+                                  blurRadius: 1,
+                                  spreadRadius: 1)
+                            ]),
+                        child: Form(
+                          key: widget.formKey,
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 20),
+                              Text(
+                                widget.projectName ?? projectNameFromModule,
+                                style: TextStyle(
+                                    fontSize: isPhone ? 18 : 24,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (isOpeniamEnabled)
+                                    _SignInAlternatives(
+                                      name: openIAMTitle,
+                                      logo: openIAMLogo,
+                                      onPressed: () => _launchLogin(
+                                          context, LoginType.openIAM),
+                                    ),
+                                  if (widget.enableGoogleLogin)
+                                    _SignInAlternatives(
+                                      name: 'Google',
+                                      logo: 'google',
+                                      onPressed:
+                                          widget.onPressedGoogleLogin ?? () {},
+                                    ),
+                                ],
+                              )
+                            ],
+                          ),
+                        ))
+                  ]),
+            ),
     );
   }
 }
