@@ -26,6 +26,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String environment;
   final bool europe;
   final String? moduleWebName;
+  final String? authenticationStatus;
 
   const FlutterAhaAuthentication({
     Key? key,
@@ -37,6 +38,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.formKey,
     this.moduleName,
     this.moduleWebName,
+    this.authenticationStatus,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -197,10 +199,17 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 ? baseUrl
                 : "https://$openIamAuthConfig";
 
-            final loginUrl =
-                '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
+            if (widget.authenticationStatus == "unauthenticated") {
+              final loginUrl =
+                  "$ahaPortal/logout/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&logout=true";
 
-            return loginUrl;
+              return loginUrl;
+            } else {
+              final loginUrl =
+                  '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
+
+              return loginUrl;
+            }
           }
         }
       }
