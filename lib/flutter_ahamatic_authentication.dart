@@ -27,10 +27,12 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final bool europe;
   final String? moduleWebName;
   final String? authenticationStatus;
+  final bool skipLoginButton;
 
   const FlutterAhaAuthentication({
     Key? key,
     this.isLoginButtonOnly,
+    this.skipLoginButton = false,
     this.projectName,
     this.projectLogoAsset,
     this.enableGoogleLogin = false,
@@ -84,10 +86,19 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     Factory(() => EagerGestureRecognizer())
   };
 
+  late bool _skipLoginButton;
+
   @override
   void initState() {
     super.initState();
+    _skipLoginButton = widget.skipLoginButton;
     fetchData();
+
+    if (_skipLoginButton) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _launchLogin(context, LoginType.openIAM);
+      });
+    }
   }
 
   Future<void> fetchData() async {
@@ -264,6 +275,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                     children: [
                       GestureDetector(
                         onTap: () {
+                          setState(() {
+                            _skipLoginButton = false;
+                          });
                           Navigator.pop(context);
                         },
                         child: const Align(
@@ -337,6 +351,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
     final bool isLoginButtonOnly = widget.isLoginButtonOnly ?? false;
+    if (_skipLoginButton) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
     return SizedBox(
       child: isLoginButtonOnly
