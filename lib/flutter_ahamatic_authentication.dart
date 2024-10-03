@@ -57,7 +57,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String openIAMLogo = '';
   String openIAMTitle = '';
   final _key = UniqueKey();
-  int progressEnded = 0;
+  int loadingPercentage = 0;
+  String? openiamLoginUrl;
 
   late String env = widget.environment;
   String url = html.window.location.href;
@@ -88,6 +89,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   void initState() {
     super.initState();
     fetchData();
+    fetchLoginUrl(LoginType.openIAM);
   }
 
   Future<void> fetchData() async {
@@ -167,6 +169,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             final loginUrl =
                 '$ahaPortal/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
 
+            setState(() {
+              openiamLoginUrl = loginUrl;
+            });
             return loginUrl;
           }
         }
@@ -222,8 +227,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
-      final response = await _dio.get(
-          '$apiUrl/marketplace/applications/validate/${widget.applicationCode}');
+      final response =
+          await _dio.get('$apiUrl/api/validateApp/${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -255,78 +260,115 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               context: context,
               barrierDismissible: false,
               builder: (BuildContext context) {
-                return AlertDialog(
-                  contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
-                  insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5)),
-                  content: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
-                        child: const Align(
-                          alignment: Alignment.topRight,
-                          child: Icon(
-                            Icons.close,
-                            color: Colors.red,
-                            size: 30,
-                            textDirection: TextDirection.rtl,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: SizedBox(
-                            width: MediaQuery.of(context).size.width,
-                            height: MediaQuery.of(context).size.height * 0.9,
-                            child: Stack(
+                return StatefulBuilder(
+                  builder: (context, setState) {
+                    return Scaffold(
+                      backgroundColor: Colors.transparent,
+                      body: Stack(
+                        children: [
+                          AlertDialog(
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(5, 5, 5, 10),
+                            insetPadding:
+                                const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            content: Column(
                               children: [
-                                WebView(
-                                  key: _key,
-                                  backgroundColor: progressEnded != 100
-                                      ? const Color(0xFF003D7F)
-                                      : Colors.transparent,
-                                  initialUrl: url,
-                                  javascriptMode: JavascriptMode.unrestricted,
-                                  navigationDelegate:
-                                      (NavigationRequest request) async {
-                                    Uri uri = Uri.parse(request.url);
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Align(
+                                    alignment: Alignment.topRight,
+                                    child: Icon(
+                                      Icons.close,
+                                      color: Colors.red,
+                                      size: 30,
+                                      textDirection: TextDirection.rtl,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: SizedBox(
+                                    width: MediaQuery.of(context).size.width,
+                                    height: MediaQuery.of(context).size.height *
+                                        0.9,
+                                    child: Stack(
+                                      children: [
+                                        WebView(
+                                          key: _key,
+                                          backgroundColor: Colors.transparent,
+                                          initialUrl: url,
+                                          javascriptMode:
+                                              JavascriptMode.unrestricted,
+                                          navigationDelegate: (NavigationRequest
+                                              request) async {
+                                            Uri uri = Uri.parse(request.url);
 
-                                    if (uri.queryParameters
-                                        .containsKey('refreshToken')) {
-                                      if (await canLaunchUrl(uri)) {
-                                        await launchUrl(uri).then((_) {
-                                          if (!context.mounted) return;
-                                          Navigator.pop(context);
-                                        });
-                                      } else {
-                                        debugPrint(' could not launch $uri');
-                                      }
-
-                                      return NavigationDecision.prevent;
-                                    }
-                                    return NavigationDecision.navigate;
-                                  },
-                                  onWebViewCreated: (webViewController) {
-                                    webViewController.clearCache();
-                                    final cookieManager = CookieManager();
-                                    cookieManager.clearCookies();
-                                  },
-                                  gestureRecognizers: gestureRecognizers,
-                                  onProgress: (int progress) {
-                                    setState(() {
-                                      progressEnded = progress;
-                                    });
-                                  },
+                                            if (uri.queryParameters
+                                                .containsKey('refreshToken')) {
+                                              if (await canLaunchUrl(uri)) {
+                                                await launchUrl(uri).then((_) {
+                                                  if (!context.mounted) {
+                                                    return;
+                                                  }
+                                                  Navigator.pop(context);
+                                                });
+                                              } else {
+                                                debugPrint(
+                                                    'Could not launch $uri');
+                                              }
+                                              return NavigationDecision.prevent;
+                                            }
+                                            return NavigationDecision.navigate;
+                                          },
+                                          onWebViewCreated: (WebViewController
+                                              webViewController) {
+                                            webViewController.clearCache();
+                                            final cookieManager =
+                                                CookieManager();
+                                            cookieManager.clearCookies();
+                                          },
+                                          gestureRecognizers:
+                                              gestureRecognizers,
+                                          onPageStarted: (String url) {
+                                            setState(() {
+                                              loadingPercentage = 0;
+                                            });
+                                          },
+                                          onPageFinished: (String url) {
+                                            setState(() {
+                                              loadingPercentage = 100;
+                                            });
+                                          },
+                                          onProgress: (int progress) {
+                                            setState(() {
+                                              loadingPercentage = progress;
+                                            });
+                                          },
+                                        ),
+                                        if (loadingPercentage < 100)
+                                          const Center(
+                                            child: CircularProgressIndicator(
+                                              color: Color(0xFF003D7F),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
-                            )),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
-              });
+              },
+            );
     });
   }
 
@@ -400,11 +442,19 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                 children: [
                                   if (isOpeniamEnabled)
                                     _SignInAlternatives(
-                                      name: openIAMTitle,
-                                      logo: openIAMLogo,
-                                      onPressed: () => _launchLogin(
-                                          context, LoginType.openIAM),
-                                    ),
+                                        name: openIAMTitle,
+                                        logo: openIAMLogo,
+                                        onPressed: () {
+                                          SnackBar snackBar = SnackBar(
+                                              content:
+                                                  Text('$openiamLoginUrl'));
+
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(snackBar);
+
+                                          _launchLogin(
+                                              context, LoginType.openIAM);
+                                        }),
                                   if (widget.enableGoogleLogin)
                                     _SignInAlternatives(
                                       name: 'Google',
