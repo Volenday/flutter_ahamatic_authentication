@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:collection/collection.dart';
@@ -27,6 +29,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final bool europe;
   final String? moduleWebName;
   final String? authenticationStatus;
+  final String? token;
+  final String? appVersion;
 
   const FlutterAhaAuthentication({
     Key? key,
@@ -39,6 +43,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.moduleName,
     this.moduleWebName,
     this.authenticationStatus,
+    this.token,
+    this.appVersion,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -59,6 +65,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final _key = UniqueKey();
   int loadingPercentage = 0;
   String? openiamLoginUrl;
+  String? openiamToken;
 
   late String env = widget.environment;
   String url = html.window.location.href;
@@ -309,11 +316,17 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
                                             if (uri.queryParameters
                                                 .containsKey('refreshToken')) {
+                                              openiamToken =
+                                                  uri.queryParameters['token'];
+
+                                              logs(openiamToken ?? '');
+
                                               if (await canLaunchUrl(uri)) {
                                                 await launchUrl(uri).then((_) {
                                                   if (!context.mounted) {
                                                     return;
                                                   }
+
                                                   Navigator.pop(context);
                                                 });
                                               } else {
@@ -370,6 +383,41 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               },
             );
     });
+  }
+
+  Future<void> logs(String token) async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+
+    String deviceModel = '';
+    if (Platform.isAndroid) {
+      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+      deviceModel = androidInfo.model;
+    } else if (Platform.isIOS) {
+      IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+      deviceModel = iosInfo.model;
+    }
+
+    _dio.options.headers['authorization'] = token;
+
+    final Map<String, dynamic> tokenDecode = JwtDecoder.decode(token);
+    final int personId = tokenDecode['account']['PersonId'];
+
+    final params = {
+      "Action": "Abena Id Login Button Tapped",
+      "Description": "User logged in via $openiamLoginUrl",
+      "Person": personId,
+      "Entity": "${widget.moduleName}",
+      "AppVersion": "${widget.appVersion}",
+      "Device": deviceModel,
+    };
+
+    final response = await _dio.post('$apiUrl/api/e/_logs', data: params);
+
+    if (response.statusCode == 200) {
+      debugPrint('Logs: ${response.data}');
+    } else {
+      debugPrint('Failed to fetch logs: ${response.statusCode}');
+    }
   }
 
   @override
@@ -445,12 +493,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                         name: openIAMTitle,
                                         logo: openIAMLogo,
                                         onPressed: () {
-                                          SnackBar snackBar = SnackBar(
-                                              content:
-                                                  Text('$openiamLoginUrl'));
+                                          if (widget.environment !=
+                                              'production') {
+                                            SnackBar snackBar = SnackBar(
+                                                content:
+                                                    Text('$openiamLoginUrl'));
 
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(snackBar);
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(snackBar);
+                                          }
 
                                           _launchLogin(
                                               context, LoginType.openIAM);
