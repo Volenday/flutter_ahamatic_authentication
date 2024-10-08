@@ -31,6 +31,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String? authenticationStatus;
   final String? token;
   final String? appVersion;
+  final bool? externalBrowserLogin;
 
   const FlutterAhaAuthentication({
     Key? key,
@@ -45,6 +46,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.authenticationStatus,
     this.token,
     this.appVersion,
+    this.externalBrowserLogin = false,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -258,130 +260,151 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
   }
 
+  Widget _buildWebView(BuildContext context, String url, StateSetter setState) {
+    return WebView(
+      key: _key,
+      backgroundColor: Colors.transparent,
+      initialUrl: url,
+      javascriptMode: JavascriptMode.unrestricted,
+      navigationDelegate: (NavigationRequest request) async {
+        Uri uri = Uri.parse(request.url);
+
+        if (uri.queryParameters.containsKey('refreshToken')) {
+          openiamToken = uri.queryParameters['token'];
+
+          logs(openiamToken ?? '');
+
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri).then((_) {
+              if (!context.mounted) {
+                return;
+              }
+
+              Navigator.pop(context);
+            });
+          } else {
+            debugPrint('Could not launch $uri');
+          }
+          return NavigationDecision.prevent;
+        }
+        return NavigationDecision.navigate;
+      },
+      onWebViewCreated: (WebViewController webViewController) {
+        webViewController.clearCache();
+        final cookieManager = CookieManager();
+        cookieManager.clearCookies();
+      },
+      gestureRecognizers: gestureRecognizers,
+      onPageStarted: (String url) {
+        setState(() {
+          loadingPercentage = 0;
+        });
+      },
+      onPageFinished: (String url) {
+        setState(() {
+          loadingPercentage = 100;
+        });
+      },
+      onProgress: (int progress) {
+        setState(() {
+          loadingPercentage = progress;
+        });
+      },
+    );
+  }
+
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
-    fetchLoginUrl(loginType).then((url) {
+    fetchLoginUrl(loginType).then((url) async {
       if (!context.mounted) return;
-      kIsWeb
-          ? html.window.open(url!, '_self')
-          : showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (BuildContext context) {
-                return StatefulBuilder(
-                  builder: (context, setState) {
-                    return Scaffold(
-                      backgroundColor: Colors.transparent,
-                      body: Stack(
-                        children: [
-                          AlertDialog(
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(5, 5, 5, 10),
-                            insetPadding:
-                                const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            content: Column(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: const Align(
-                                    alignment: Alignment.topRight,
-                                    child: Icon(
-                                      Icons.close,
-                                      color: Colors.red,
-                                      size: 30,
-                                      textDirection: TextDirection.rtl,
+
+      if (widget.externalBrowserLogin == true) {
+        await launchUrl(Uri.parse(url ?? ''),
+            mode: LaunchMode.externalApplication);
+      } else {
+        kIsWeb
+            ? html.window.open(url!, '_self')
+            : showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return StatefulBuilder(
+                    builder: (context, setState) {
+                      return Scaffold(
+                        backgroundColor: Colors.transparent,
+                        body: Stack(
+                          children: [
+                            AlertDialog(
+                              contentPadding:
+                                  const EdgeInsets.fromLTRB(5, 5, 5, 10),
+                              insetPadding:
+                                  const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              content: Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Align(
+                                      alignment: Alignment.topRight,
+                                      child: Icon(
+                                        Icons.close,
+                                        color: Colors.red,
+                                        size: 30,
+                                        textDirection: TextDirection.rtl,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: SizedBox(
-                                    width: MediaQuery.of(context).size.width,
-                                    height: MediaQuery.of(context).size.height *
-                                        0.9,
-                                    child: Stack(
-                                      children: [
-                                        WebView(
-                                          key: _key,
-                                          backgroundColor: Colors.transparent,
-                                          initialUrl: url,
-                                          javascriptMode:
-                                              JavascriptMode.unrestricted,
-                                          navigationDelegate: (NavigationRequest
-                                              request) async {
-                                            Uri uri = Uri.parse(request.url);
-
-                                            if (uri.queryParameters
-                                                .containsKey('refreshToken')) {
-                                              openiamToken =
-                                                  uri.queryParameters['token'];
-
-                                              logs(openiamToken ?? '');
-
-                                              if (await canLaunchUrl(uri)) {
-                                                await launchUrl(uri).then((_) {
-                                                  if (!context.mounted) {
-                                                    return;
-                                                  }
-
-                                                  Navigator.pop(context);
-                                                });
-                                              } else {
-                                                debugPrint(
-                                                    'Could not launch $uri');
-                                              }
-                                              return NavigationDecision.prevent;
-                                            }
-                                            return NavigationDecision.navigate;
-                                          },
-                                          onWebViewCreated: (WebViewController
-                                              webViewController) {
-                                            webViewController.clearCache();
-                                            final cookieManager =
-                                                CookieManager();
-                                            cookieManager.clearCookies();
-                                          },
-                                          gestureRecognizers:
-                                              gestureRecognizers,
-                                          onPageStarted: (String url) {
-                                            setState(() {
-                                              loadingPercentage = 0;
-                                            });
-                                          },
-                                          onPageFinished: (String url) {
-                                            setState(() {
-                                              loadingPercentage = 100;
-                                            });
-                                          },
-                                          onProgress: (int progress) {
-                                            setState(() {
-                                              loadingPercentage = progress;
-                                            });
-                                          },
-                                        ),
-                                        if (loadingPercentage < 100)
-                                          const Center(
-                                            child: CircularProgressIndicator(
-                                              color: Color(0xFF003D7F),
+                                  Expanded(
+                                    child: SizedBox(
+                                      width: MediaQuery.of(context).size.width,
+                                      height:
+                                          MediaQuery.of(context).size.height *
+                                              0.9,
+                                      child: Stack(
+                                        children: [
+                                          _buildWebView(
+                                              context, url ?? '', setState),
+                                          if (loadingPercentage < 100)
+                                            Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const Center(
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    color: Color(0xFF003D7F),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 10),
+                                                Center(
+                                                  child: Text(
+                                                    'Loading... $loadingPercentage%',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF003D7F),
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            );
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+      }
     });
   }
 
