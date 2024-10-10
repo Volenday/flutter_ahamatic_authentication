@@ -344,9 +344,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               content: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                    },
+                                    onTap: () => Navigator.pop(context),
                                     child: const Align(
                                       alignment: Alignment.topRight,
                                       child: Icon(
@@ -368,27 +366,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                           _buildWebView(
                                               context, url ?? '', setState),
                                           if (loadingPercentage < 100)
-                                            Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                const Center(
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    color: Color(0xFF003D7F),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 10),
-                                                Center(
-                                                  child: Text(
-                                                    'Loading... $loadingPercentage%',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF003D7F),
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                            const Center(
+                                              child: CircularProgressIndicator(
+                                                color: Color(0xFF003D7F),
+                                              ),
                                             ),
                                         ],
                                       ),
