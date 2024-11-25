@@ -65,7 +65,6 @@ class _MyAppState extends State<MyApp> {
                 applicationCode: 'abenadata',
                 environment: environment,
                 europe: true,
-                externalBrowserLogin: true,
               ),
             ),
           ),

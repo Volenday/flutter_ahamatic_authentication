@@ -103,8 +103,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<void> fetchData() async {
     try {
-      final response =
-          await _dio.get('$apiUrl/api/validateApp/${widget.applicationCode}');
+      final response = await _dio
+          .get('$apiUrl/api/validate/app?value=${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
@@ -236,8 +236,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   Future<String?> fetchLoginUrl(LoginType loginType) async {
     try {
-      final response =
-          await _dio.get('$apiUrl/api/validateApp/${widget.applicationCode}');
+      final response = await _dio
+          .get('$apiUrl/api/validate/app?value=${widget.applicationCode}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
