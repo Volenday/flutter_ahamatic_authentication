@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 import 'dart:io';
 
@@ -34,7 +36,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final bool? externalBrowserLogin;
 
   const FlutterAhaAuthentication({
-    Key? key,
+    super.key,
     this.isLoginButtonOnly,
     this.projectName,
     this.projectLogoAsset,
@@ -50,7 +52,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     required this.applicationCode,
     required this.environment,
     required this.europe,
-  }) : super(key: key);
+  });
 
   @override
   State<FlutterAhaAuthentication> createState() =>
@@ -70,7 +72,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamToken;
 
   late String env = widget.environment;
-  String url = html.window.location.href;
+  String url = kIsWeb ? html.window.location.href : '';
 
   late final apiUrl = {
     'development': 'https://dev.api.ahamatic.com',
@@ -94,9 +96,67 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     Factory(() => EagerGestureRecognizer())
   };
 
+  late final WebViewController _webViewController;
+
   @override
   void initState() {
     super.initState();
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            setState(() {
+              loadingPercentage = progress;
+            });
+          },
+          onPageStarted: (String url) {
+            setState(() {
+              loadingPercentage = 0;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              loadingPercentage = 100;
+            });
+          },
+          onWebResourceError: (WebResourceError error) {
+            debugPrint('''
+Page resource error:
+  Code: ${error.errorCode}
+  Description: ${error.description}
+  For URL: ${error.url}
+  ErrorType: ${error.errorType}
+            ''');
+          },
+          onNavigationRequest: (NavigationRequest request) async {
+            Uri uri = Uri.parse(request.url);
+
+            if (uri.queryParameters.containsKey('refreshToken')) {
+              openiamToken = uri.queryParameters['token'];
+
+              logs(openiamToken ?? '');
+
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri).then((_) {
+                  if (!context.mounted) {
+                    return;
+                  }
+
+                  Navigator.pop(context);
+                });
+              } else {
+                debugPrint('Could not launch $uri');
+              }
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
+
+    WebViewCookieManager().clearCookies();
+
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
   }
@@ -169,11 +229,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           );
 
           if (moduleConfig != null) {
-            final openIamAuthConfig = moduleConfig['HostName'];
+            final openIAMHost = moduleConfig['HostName'];
 
-            final scheme = isAndroid
-                ? 'app://$openIamAuthConfig'
-                : '$openIamAuthConfig://';
+            final scheme = isAndroid ? 'app://$openIAMHost' : '$openIAMHost://';
 
             final loginUrl =
                 '$ahaPortal/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
@@ -204,14 +262,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           );
 
           if (moduleConfig != null) {
-            final openIamAuthConfig = moduleConfig['HostName'];
+            final openIAMHost = moduleConfig['HostName'];
 
             final uri = Uri.parse(url);
             final baseUrl = '${uri.scheme}://${uri.host}:${uri.port}';
 
-            final callback = url.contains('localhost')
-                ? baseUrl
-                : "https://$openIamAuthConfig";
+            final callback =
+                url.contains('localhost') ? baseUrl : "https://$openIAMHost";
 
             if (widget.authenticationStatus == "unauthenticated") {
               final loginUrl =
@@ -261,55 +318,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Widget _buildWebView(BuildContext context, String url, StateSetter setState) {
-    return WebView(
+    _webViewController.loadRequest(Uri.parse(url));
+    return WebViewWidget(
       key: _key,
-      backgroundColor: Colors.transparent,
-      initialUrl: url,
-      javascriptMode: JavascriptMode.unrestricted,
-      navigationDelegate: (NavigationRequest request) async {
-        Uri uri = Uri.parse(request.url);
-
-        if (uri.queryParameters.containsKey('refreshToken')) {
-          openiamToken = uri.queryParameters['token'];
-
-          logs(openiamToken ?? '');
-
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri).then((_) {
-              if (!context.mounted) {
-                return;
-              }
-
-              Navigator.pop(context);
-            });
-          } else {
-            debugPrint('Could not launch $uri');
-          }
-          return NavigationDecision.prevent;
-        }
-        return NavigationDecision.navigate;
-      },
-      onWebViewCreated: (WebViewController webViewController) {
-        webViewController.clearCache();
-        final cookieManager = CookieManager();
-        cookieManager.clearCookies();
-      },
+      controller: _webViewController,
       gestureRecognizers: gestureRecognizers,
-      onPageStarted: (String url) {
-        setState(() {
-          loadingPercentage = 0;
-        });
-      },
-      onPageFinished: (String url) {
-        setState(() {
-          loadingPercentage = 100;
-        });
-      },
-      onProgress: (int progress) {
-        setState(() {
-          loadingPercentage = progress;
-        });
-      },
     );
   }
 
@@ -318,8 +331,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       if (!context.mounted) return;
 
       if (widget.externalBrowserLogin == true) {
-        await launchUrl(Uri.parse(url ?? ''),
-            mode: LaunchMode.externalApplication);
+        if (url != null) {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        } else {
+          debugPrint('Login URL is null.');
+        }
       } else {
         kIsWeb
             ? html.window.open(url!, '_self')
@@ -363,8 +379,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                               0.9,
                                       child: Stack(
                                         children: [
-                                          _buildWebView(
-                                              context, url ?? '', setState),
+                                          if (url != null)
+                                            _buildWebView(
+                                                context, url, setState),
                                           if (loadingPercentage < 100)
                                             const Center(
                                               child: CircularProgressIndicator(
@@ -410,8 +427,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       "Action": "Abena Id Login Button Tapped",
       "Description": "User logged in via $openiamLoginUrl",
       "Person": personId,
-      "Entity": "${widget.moduleName}",
-      "AppVersion": "${widget.appVersion}",
+      "Entity": widget.moduleName,
+      "AppVersion": widget.appVersion,
       "Device": deviceModel,
     };
 
@@ -534,11 +551,10 @@ class _SignInAlternatives extends StatelessWidget {
   final VoidCallback onPressed;
 
   const _SignInAlternatives({
-    Key? key,
     required this.logo,
     required this.name,
     required this.onPressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
