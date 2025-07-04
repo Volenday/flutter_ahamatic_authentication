@@ -410,6 +410,7 @@ Page resource error:
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
 
     String deviceModel = '';
+
     if (Platform.isAndroid) {
       AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
       deviceModel = androidInfo.model;
