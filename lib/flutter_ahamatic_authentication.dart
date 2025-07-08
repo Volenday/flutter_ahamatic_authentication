@@ -106,11 +106,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
+            debugPrint('Page started loading: $url');
             setState(() {
               loadingPercentage = progress;
             });
           },
           onPageStarted: (String url) {
+            debugPrint('Page finished loading: $url');
             setState(() {
               loadingPercentage = 0;
             });
@@ -122,15 +124,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('''
-Page resource error:
-  Code: ${error.errorCode}
-  Description: ${error.description}
-  For URL: ${error.url}
-  ErrorType: ${error.errorType}
+              Page resource error:
+                Code: ${error.errorCode}
+                Description: ${error.description}
+                For URL: ${error.url}
+                ErrorType: ${error.errorType}
             ''');
           },
           onNavigationRequest: (NavigationRequest request) async {
             Uri uri = Uri.parse(request.url);
+            debugPrint('Navigation request: ${request.url}');
 
             if (uri.queryParameters.containsKey('refreshToken')) {
               openiamToken = uri.queryParameters['token'];
