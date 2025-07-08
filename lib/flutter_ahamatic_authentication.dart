@@ -72,7 +72,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamToken;
   String? _lastLoadedUrl;
   Timer? _loadingTimer;
-  bool _isInitialWebViewLoad = true;
+  bool _hasMainLoginPageLoaded = false;
 
   late String env = widget.environment;
   String url = kIsWeb ? html.window.location.href : '';
@@ -110,29 +110,39 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         NavigationDelegate(
           onProgress: (int progress) {
             debugPrint('Webview Progress: $progress%');
-            // SOLO actualizamos el loadingPercentage si no estamos en el estado "finalizado"
-            // de la carga inicial del WebView.
-            // Si ya se ha cargado la página principal (y _isInitialWebViewLoad es false),
-            // ignoramos los progresos menores a 100 para no hacer reaparecer el loader.
-            if (_isInitialWebViewLoad || progress == 100) {
-              setState(() {
-                loadingPercentage = progress;
-              });
-            } else if (progress < 100 && loadingPercentage == 100) {
-              // Si ya estaba en 100 y el progreso baja, no hacemos nada para evitar que el loader reaparezca
-              debugPrint(
-                  'DEBUG: Ignorando descenso de progreso para SPA ya cargada.');
+            // Si la página principal de login ya se ha cargado,
+            // ignoramos cualquier progreso que no sea 100% para evitar que el loader reaparezca.
+            if (_hasMainLoginPageLoaded) {
+              if (loadingPercentage < 100 && progress < 100) {
+                // Si por alguna razón el loader está visible y el progreso no es 100,
+                // pero la página principal ya cargó, lo forzamos a 100 para ocultarlo.
+                setState(() {
+                  loadingPercentage = 100;
+                });
+                debugPrint(
+                    'DEBUG: Forzando ocultamiento de loader debido a onProgress inesperado.');
+              }
+              return; // No hacer nada más con el progreso si la página principal ya cargó
             }
+
+            // Si aún no ha cargado la página principal, actualizamos el porcentaje normalmente.
+            setState(() {
+              loadingPercentage = progress;
+            });
           },
           onPageStarted: (String url) {
             debugPrint('Page started loading: $url');
 
-            // Siempre reiniciar el loader y el timer si es la carga inicial del WebView,
+            // Siempre reiniciar el loader y el timer si es la carga inicial
             // o si es una navegación a una URL significativamente diferente.
-            if (_isInitialWebViewLoad ||
-                (url.isNotEmpty && url != _lastLoadedUrl)) {
+            // La condición "_hasMainLoginPageLoaded && url == _lastLoadedUrl"
+            // cubre las recargas internas de la SPA.
+            if (url.isNotEmpty &&
+                (_lastLoadedUrl == null || url != _lastLoadedUrl)) {
               setState(() {
                 loadingPercentage = 0;
+                _hasMainLoginPageLoaded =
+                    false; // Reiniciar este estado para una nueva carga
               });
 
               _loadingTimer
@@ -146,15 +156,23 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                   });
                 }
               });
-              _isInitialWebViewLoad =
-                  false; // Marcar que la carga inicial ha comenzado
-            } else {
-              // Si es una "recarga" interna de la SPA (misma URL o vacía),
-              // y ya habíamos terminado la carga principal, asegurar que el loader esté oculto.
+            } else if (url.isNotEmpty &&
+                _hasMainLoginPageLoaded &&
+                url == _lastLoadedUrl) {
+              // Caso específico: onPageStarted con la misma URL que ya terminó de cargar la SPA
               debugPrint(
-                  'DEBUG: Ignorando Page started loading interno de SPA: $url (ya se había cargado)');
+                  'DEBUG: Ignorando Page started loading repetido de la misma SPA URL.');
+              // Aseguramos que el loader esté oculto.
               if (loadingPercentage < 100) {
-                // Si por alguna razón el loader está visible, ocultarlo
+                setState(() {
+                  loadingPercentage = 100;
+                });
+              }
+            } else if (url.isEmpty && _hasMainLoginPageLoaded) {
+              // Caso específico: onPageStarted con URL vacía después de que la SPA ya cargó
+              debugPrint(
+                  'DEBUG: Ignorando Page started loading vacío de SPA ya cargada.');
+              if (loadingPercentage < 100) {
                 setState(() {
                   loadingPercentage = 100;
                 });
@@ -167,8 +185,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             setState(() {
               loadingPercentage = 100; // Establece a 100%
               _lastLoadedUrl = url; // Guarda la URL final
-              _isInitialWebViewLoad =
-                  false; // Confirmar que la carga inicial de este flujo ha terminado
+
+              // Si esta es la URL de login principal de OpenIAM, la marcamos como "cargada".
+              // Usa 'contains' por si hay parámetros extra en la URL.
+              if (url.contains('test.id.abena.com/idp/login') ||
+                  url.contains('test.id.abena.com/idp/oauth2/authorize')) {
+                _hasMainLoginPageLoaded = true;
+                debugPrint(
+                    'INFO: Página principal de login OpenIAM marcada como completamente cargada.');
+              }
             });
           },
           onWebResourceError: (WebResourceError error) {
@@ -182,8 +207,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             if (mounted) {
               setState(() {
                 loadingPercentage = 100; // Ocultar loader en caso de error
-                _isInitialWebViewLoad =
-                    false; // Considerar el flujo de carga como terminado (con error)
+                _hasMainLoginPageLoaded =
+                    true; // Considerar el flujo de carga como terminado (con error)
               });
             }
           },
@@ -191,6 +216,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             Uri uri = Uri.parse(request.url);
             debugPrint('Navigation request: ${request.url}');
 
+            // Si detectamos el token (login exitoso), ocultamos el loader y cerramos.
             if (uri.queryParameters.containsKey('refreshToken')) {
               openiamToken = uri.queryParameters['token'];
               logs(openiamToken ?? '');
@@ -200,7 +226,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                   if (!context.mounted) return;
                   setState(() {
                     loadingPercentage = 100; // Oculta el loader
-                    _isInitialWebViewLoad = false; // Asegura el estado final
+                    _hasMainLoginPageLoaded = true; // Asegura el estado final
                   });
                   Navigator.pop(context);
                 });
@@ -210,15 +236,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               return NavigationDecision.prevent;
             }
 
-            // Si se navega a una URL completamente diferente, reiniciar el estado de carga
+            // Si se navega a una URL completamente diferente que no sea la última cargada,
+            // esto es una nueva navegación significativa. Reiniciamos el estado del loader.
             if (request.url.isNotEmpty && request.url != _lastLoadedUrl) {
               debugPrint(
-                  'INFO: Nueva navegación a URL diferente: ${request.url}');
+                  'INFO: Nueva navegación a URL diferente: ${request.url}. Reiniciando loader.');
               setState(() {
                 loadingPercentage = 0; // Mostrar el loader para la nueva carga
-                _isInitialWebViewLoad =
-                    true; // Restablecer para que onPageStarted se comporte como una nueva carga
-                // No resetear _lastLoadedUrl aquí, se actualizará en onPageFinished de la nueva URL
+                _hasMainLoginPageLoaded = false; // Resetear bandera
               });
             }
             return NavigationDecision.navigate;
