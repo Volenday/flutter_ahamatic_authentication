@@ -561,8 +561,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               Text(
                                 widget.projectName ?? projectNameFromModule,
                                 style: TextStyle(
-                                    fontSize: isPhone ? 18 : 24,
-                                    fontWeight: FontWeight.bold),
+                                  fontSize: isPhone ? 18 : 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
                               ),
                               const SizedBox(height: 20),
                               Row(
