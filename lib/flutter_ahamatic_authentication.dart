@@ -71,6 +71,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamLoginUrl;
   String? openiamToken;
 
+  Timer? _loadingTimer;
+  bool _hasPageFinishedOnce = false;
+
   late String env = widget.environment;
   String url = kIsWeb ? html.window.location.href : '';
 
@@ -106,32 +109,54 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            debugPrint('Page started loading: $url');
             setState(() {
               loadingPercentage = progress;
             });
           },
           onPageStarted: (String url) {
-            debugPrint('Page finished loading: $url');
-            if (url.isNotEmpty && !url.contains('idp/login')) {
-              setState(() {
+            debugPrint('Page started loading: $url');
+            setState(() {
+              if (url.isNotEmpty &&
+                  (!_hasPageFinishedOnce ||
+                      url.contains('test.id.abena.com/idp/oauth2/authorize') ||
+                      url.contains('test.id.abena.com/idp/login'))) {
                 loadingPercentage = 0;
-              });
-            }
+              } else if (url.isEmpty && _hasPageFinishedOnce) {
+                return;
+              }
+            });
+
+            _loadingTimer?.cancel();
+            _loadingTimer = Timer(const Duration(seconds: 15), () {
+              if (loadingPercentage < 100 && mounted) {
+                debugPrint('INFO: Forcing end of loading after 15 seconds.');
+                setState(() {
+                  loadingPercentage = 100;
+                });
+              }
+            });
           },
           onPageFinished: (String url) {
+            debugPrint('Page finished loading: $url');
+            _loadingTimer?.cancel();
             setState(() {
               loadingPercentage = 100;
+              _hasPageFinishedOnce = true;
             });
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('''
-              Page resource error:
-                Code: ${error.errorCode}
-                Description: ${error.description}
-                For URL: ${error.url}
-                ErrorType: ${error.errorType}
-            ''');
+            Page resource error:
+              Code: ${error.errorCode}
+              Description: ${error.description}
+              For URL: ${error.url}
+              ErrorType: ${error.errorType}
+          ''');
+            if (mounted) {
+              setState(() {
+                loadingPercentage = 100;
+              });
+            }
           },
           onNavigationRequest: (NavigationRequest request) async {
             Uri uri = Uri.parse(request.url);
@@ -147,7 +172,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                   if (!context.mounted) {
                     return;
                   }
-
+                  setState(() {
+                    loadingPercentage = 100;
+                    _hasPageFinishedOnce = true;
+                  });
                   Navigator.pop(context);
                 });
               } else {
@@ -164,6 +192,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
+  }
+
+  @override
+  void dispose() {
+    _loadingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> fetchData() async {
