@@ -70,8 +70,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   int loadingPercentage = 0;
   String? openiamLoginUrl;
   String? openiamToken;
-  String? _lastLoadedUrl;
+  String? _lastLoadedUrl; // Mantener para onNavigationRequest si se necesita
   Timer? _loadingTimer;
+  // La bandera _isWebViewReadyForInteraction ya no es estrictamente necesaria con el fix de loadRequest
+  // pero la mantengo para la lógica del temporizador de respaldo.
   bool _isWebViewReadyForInteraction = false;
 
   late String env = widget.environment;
@@ -110,12 +112,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         NavigationDelegate(
           onProgress: (int progress) {
             debugPrint('Webview Progress: $progress%');
-            // Si el WebView ya está listo para la interacción, no actualizamos el progreso a menos que sea 100
-            // o que la página principal de login ya haya terminado de cargar.
+            // Si el WebView ya está marcado como listo para interacción,
+            // solo actualizamos el progreso si es 100% para asegurar que el loader se oculte.
+            // Esto es para ignorar los descensos de progreso de SPAs ya cargadas.
             if (_isWebViewReadyForInteraction && progress < 100) {
               debugPrint(
-                  'DEBUG: Ignorando progreso bajo después de WebView estar listo.');
-              return; // No hacer nada, el loader ya debería estar oculto.
+                  'DEBUG: Ignorando progreso bajo para WebView ya listo.');
+              return;
             }
             setState(() {
               loadingPercentage = progress;
@@ -134,7 +137,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             _loadingTimer?.cancel();
             // Establecer un temporizador para ocultar el loader después de un tiempo prudencial
             _loadingTimer = Timer(const Duration(seconds: 25), () {
-              // Aumentar tiempo a 25s
+              // Aumentar tiempo a 25s por seguridad
               if (mounted) {
                 debugPrint(
                     'INFO: Forzando el fin de la carga después de 25 segundos (por timeout).');
@@ -157,11 +160,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
             // Ahora, esperar un breve tiempo adicional después de onPageFinished
             // para que la SPA tenga tiempo de renderizar su contenido dinámico final.
-            // Esto es un 'hack' para SPAs.
             Future.delayed(const Duration(milliseconds: 500), () {
-              // Espera 0.5 segundos adicionales
               if (mounted && loadingPercentage == 100) {
-                // Si el loader sigue en 100, significa que no hubo otra carga en este lapso
                 setState(() {
                   _isWebViewReadyForInteraction = true;
                   debugPrint(
@@ -227,6 +227,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     WebViewCookieManager().clearCookies();
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
+    // La llamada inicial a fetchLoginUrl solo obtiene la URL. La carga real del WebView
+    // ocurrirá en _launchLogin cuando se abra el diálogo.
   }
 
   @override
@@ -391,8 +393,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
   }
 
+  // --- FUNCIÓN _buildWebView MODIFICADA: YA NO LLAMA A loadRequest ---
   Widget _buildWebView(BuildContext context, String url, StateSetter setState) {
-    _webViewController.loadRequest(Uri.parse(url));
+    // IMPORTANTE: _webViewController.loadRequest(Uri.parse(url)); YA NO VA AQUÍ.
+    // La URL se carga en _launchLogin, una única vez.
     return WebViewWidget(
       key: _key,
       controller: _webViewController,
@@ -411,14 +415,35 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           debugPrint('Login URL is null.');
         }
       } else {
+        // --- CÓDIGO CRÍTICO PARA CARGAR LA URL DEL WEBVIEW UNA VEZ ---
+        if (url != null) {
+          // Resetear el estado del loader y del WebView ANTES de cargar la nueva URL
+          // Este setState se ejecuta en el contexto del State principal (_FlutterAhaAuthenticationState)
+          // para preparar el loader antes de abrir el diálogo.
+          setState(() {
+            loadingPercentage = 0;
+            _isWebViewReadyForInteraction = false;
+            _lastLoadedUrl =
+                null; // Reiniciar la última URL cargada para la nueva navegación
+          });
+          _webViewController.loadRequest(
+              Uri.parse(url)); // <-- ¡Cargar la URL AQUÍ, una única vez!
+        } else {
+          debugPrint('Login URL is null, cannot load WebView.');
+          return; // No intentar mostrar el diálogo si la URL es nula
+        }
+        // --- FIN DEL CÓDIGO CRÍTICO ---
+
         kIsWeb
             ? html.window.open(url!, '_self')
             : showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (BuildContext context) {
+                builder: (BuildContext dialogContext) {
+                  // Renombrado a dialogContext para evitar confusión
                   return StatefulBuilder(
                     builder: (context, setState) {
+                      // Este setState es local al diálogo
                       return Scaffold(
                         backgroundColor: Colors.transparent,
                         body: Stack(
@@ -434,7 +459,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               content: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () => Navigator.pop(context),
+                                    onTap: () => Navigator.pop(
+                                        dialogContext), // Usar dialogContext para pop
                                     child: const Align(
                                       alignment: Alignment.topRight,
                                       child: Icon(
@@ -453,9 +479,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                               0.9,
                                       child: Stack(
                                         children: [
+                                          // El WebViewWidget ahora solo muestra el controller
+                                          // La URL ya ha sido cargada.
                                           if (url != null)
-                                            _buildWebView(
-                                                context, url, setState),
+                                            WebViewWidget(
+                                              key: _key,
+                                              controller: _webViewController,
+                                              gestureRecognizers:
+                                                  gestureRecognizers,
+                                            ),
                                           if (loadingPercentage < 100)
                                             const Center(
                                               child: CircularProgressIndicator(
