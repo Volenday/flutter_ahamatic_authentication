@@ -17,7 +17,6 @@ import 'package:universal_html/html.dart' as html;
 
 enum LoginType { azure, mitId, openIAM }
 
-// ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
   final bool? isLoginButtonOnly;
   final String? projectName;
@@ -70,10 +69,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   int loadingPercentage = 0;
   String? openiamLoginUrl;
   String? openiamToken;
-  String? _lastLoadedUrl; // Mantener para onNavigationRequest si se necesita
+  String? _lastLoadedUrl;
   Timer? _loadingTimer;
-  // La bandera _isWebViewReadyForInteraction ya no es estrictamente necesaria con el fix de loadRequest
-  // pero la mantengo para la lógica del temporizador de respaldo.
   bool _isWebViewReadyForInteraction = false;
 
   late String env = widget.environment;
@@ -112,12 +109,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         NavigationDelegate(
           onProgress: (int progress) {
             debugPrint('Webview Progress: $progress%');
-            // Si el WebView ya está marcado como listo para interacción,
-            // solo actualizamos el progreso si es 100% para asegurar que el loader se oculte.
-            // Esto es para ignorar los descensos de progreso de SPAs ya cargadas.
             if (_isWebViewReadyForInteraction && progress < 100) {
               debugPrint(
-                  'DEBUG: Ignorando progreso bajo para WebView ya listo.');
+                  'DEBUG: Ignoring low progress after WebView is ready.');
               return;
             }
             setState(() {
@@ -126,46 +120,37 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           },
           onPageStarted: (String url) {
             debugPrint('Page started loading: $url');
-            // Reiniciar el estado de "listo para interacción" en cada nueva carga
             _isWebViewReadyForInteraction = false;
-
-            // Mostrar el loader en cada inicio de página
             setState(() {
               loadingPercentage = 0;
             });
 
             _loadingTimer?.cancel();
-            // Establecer un temporizador para ocultar el loader después de un tiempo prudencial
             _loadingTimer = Timer(const Duration(seconds: 25), () {
-              // Aumentar tiempo a 25s por seguridad
               if (mounted) {
                 debugPrint(
-                    'INFO: Forzando el fin de la carga después de 25 segundos (por timeout).');
+                    'INFO: Forcing end of loading after 25 seconds (timeout).');
                 setState(() {
                   loadingPercentage = 100;
-                  _isWebViewReadyForInteraction =
-                      true; // Forzar estado de "listo"
+                  _isWebViewReadyForInteraction = true;
                 });
               }
             });
           },
           onPageFinished: (String url) {
             debugPrint('Page finished loading: $url');
-            _loadingTimer
-                ?.cancel(); // Cancela el temporizador si la carga finalizó
+            _loadingTimer?.cancel();
             setState(() {
-              loadingPercentage = 100; // Siempre poner a 100
+              loadingPercentage = 100;
               _lastLoadedUrl = url;
             });
 
-            // Ahora, esperar un breve tiempo adicional después de onPageFinished
-            // para que la SPA tenga tiempo de renderizar su contenido dinámico final.
             Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted && loadingPercentage == 100) {
+              if (mounted) {
                 setState(() {
                   _isWebViewReadyForInteraction = true;
                   debugPrint(
-                      'INFO: WebView marcado como listo para interacción tras onPageFinished + retraso.');
+                      'INFO: WebView marked as ready for interaction after onPageFinished + delay.');
                 });
               }
             });
@@ -178,11 +163,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 For URL: ${error.url}
                 ErrorType: ${error.errorType}
             ''');
+            _loadingTimer?.cancel();
             if (mounted) {
               setState(() {
                 loadingPercentage = 100;
-                _isWebViewReadyForInteraction =
-                    true; // En caso de error, también asumimos que no habrá más progreso
+                _isWebViewReadyForInteraction = true;
               });
             }
           },
@@ -197,10 +182,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri).then((_) {
                   if (!context.mounted) return;
-                  _loadingTimer?.cancel(); // Asegurar cancelación final
+                  _loadingTimer?.cancel();
                   setState(() {
-                    loadingPercentage = 100; // Oculta el loader
-                    _isWebViewReadyForInteraction = true; // Listo
+                    loadingPercentage = 100;
+                    _isWebViewReadyForInteraction = true;
                   });
                   Navigator.pop(context);
                 });
@@ -210,13 +195,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               return NavigationDecision.prevent;
             }
 
-            // Si es una navegación a una URL completamente diferente, reiniciar el estado de carga
             if (request.url.isNotEmpty && request.url != _lastLoadedUrl) {
               debugPrint(
-                  'INFO: Nueva navegación a URL diferente: ${request.url}. Reiniciando loader.');
+                  'INFO: New navigation to different URL: ${request.url}. Restarting loader.');
               setState(() {
-                loadingPercentage = 0; // Mostrar el loader
-                _isWebViewReadyForInteraction = false; // No listo
+                loadingPercentage = 0;
+                _isWebViewReadyForInteraction = false;
               });
             }
             return NavigationDecision.navigate;
@@ -227,8 +211,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     WebViewCookieManager().clearCookies();
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
-    // La llamada inicial a fetchLoginUrl solo obtiene la URL. La carga real del WebView
-    // ocurrirá en _launchLogin cuando se abra el diálogo.
   }
 
   @override
@@ -393,17 +375,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
   }
 
-  // --- FUNCIÓN _buildWebView MODIFICADA: YA NO LLAMA A loadRequest ---
-  Widget _buildWebView(BuildContext context, String url, StateSetter setState) {
-    // IMPORTANTE: _webViewController.loadRequest(Uri.parse(url)); YA NO VA AQUÍ.
-    // La URL se carga en _launchLogin, una única vez.
-    return WebViewWidget(
-      key: _key,
-      controller: _webViewController,
-      gestureRecognizers: gestureRecognizers,
-    );
-  }
-
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
     fetchLoginUrl(loginType).then((url) async {
       if (!context.mounted) return;
@@ -415,35 +386,26 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           debugPrint('Login URL is null.');
         }
       } else {
-        // --- CÓDIGO CRÍTICO PARA CARGAR LA URL DEL WEBVIEW UNA VEZ ---
         if (url != null) {
-          // Resetear el estado del loader y del WebView ANTES de cargar la nueva URL
-          // Este setState se ejecuta en el contexto del State principal (_FlutterAhaAuthenticationState)
-          // para preparar el loader antes de abrir el diálogo.
           setState(() {
             loadingPercentage = 0;
             _isWebViewReadyForInteraction = false;
-            _lastLoadedUrl =
-                null; // Reiniciar la última URL cargada para la nueva navegación
+            _lastLoadedUrl = null;
           });
-          _webViewController.loadRequest(
-              Uri.parse(url)); // <-- ¡Cargar la URL AQUÍ, una única vez!
+          _webViewController.loadRequest(Uri.parse(url));
         } else {
           debugPrint('Login URL is null, cannot load WebView.');
-          return; // No intentar mostrar el diálogo si la URL es nula
+          return;
         }
-        // --- FIN DEL CÓDIGO CRÍTICO ---
 
         kIsWeb
-            ? html.window.open(url!, '_self')
+            ? html.window.open(url, '_self')
             : showDialog(
                 context: context,
                 barrierDismissible: false,
                 builder: (BuildContext dialogContext) {
-                  // Renombrado a dialogContext para evitar confusión
                   return StatefulBuilder(
                     builder: (context, setState) {
-                      // Este setState es local al diálogo
                       return Scaffold(
                         backgroundColor: Colors.transparent,
                         body: Stack(
@@ -459,8 +421,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               content: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () => Navigator.pop(
-                                        dialogContext), // Usar dialogContext para pop
+                                    onTap: () => Navigator.pop(dialogContext),
                                     child: const Align(
                                       alignment: Alignment.topRight,
                                       child: Icon(
@@ -479,21 +440,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                               0.9,
                                       child: Stack(
                                         children: [
-                                          // El WebViewWidget ahora solo muestra el controller
-                                          // La URL ya ha sido cargada.
-                                          if (url != null)
-                                            WebViewWidget(
-                                              key: _key,
-                                              controller: _webViewController,
-                                              gestureRecognizers:
-                                                  gestureRecognizers,
-                                            ),
-                                          if (loadingPercentage < 100)
-                                            const Center(
-                                              child: CircularProgressIndicator(
-                                                color: Color(0xFF003D7F),
-                                              ),
-                                            ),
+                                          WebViewWidget(
+                                            key: _key,
+                                            controller: _webViewController,
+                                            gestureRecognizers:
+                                                gestureRecognizers,
+                                          ),
                                         ],
                                       ),
                                     ),
