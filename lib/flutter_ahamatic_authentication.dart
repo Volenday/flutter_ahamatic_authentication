@@ -113,9 +113,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           },
           onPageStarted: (String url) {
             debugPrint('Page finished loading: $url');
-            setState(() {
-              loadingPercentage = 0;
-            });
+            if (url.isNotEmpty && !url.contains('idp/login')) {
+              setState(() {
+                loadingPercentage = 0;
+              });
+            }
           },
           onPageFinished: (String url) {
             setState(() {
