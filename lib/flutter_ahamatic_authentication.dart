@@ -317,8 +317,7 @@ Page resource error:
     }
   }
 
-  Widget _buildWebView(BuildContext context, String url, StateSetter setState) {
-    _webViewController.loadRequest(Uri.parse(url));
+  Widget _buildWebView(BuildContext context) {
     return WebViewWidget(
       key: _key,
       controller: _webViewController,
@@ -337,6 +336,12 @@ Page resource error:
           debugPrint('Login URL is null.');
         }
       } else {
+
+        if (url != null) {
+          _webViewController
+              .loadRequest(Uri.parse(url));
+        }
+
         kIsWeb
             ? html.window.open(url!, '_self')
             : showDialog(
@@ -381,7 +386,7 @@ Page resource error:
                                         children: [
                                           if (url != null)
                                             _buildWebView(
-                                                context, url, setState),
+                                                context),
                                           if (loadingPercentage < 100)
                                             const Center(
                                               child: CircularProgressIndicator(
