@@ -318,7 +318,6 @@ Page resource error:
   }
 
   Widget _buildWebView(BuildContext context) {
-    // _webViewController.loadRequest(Uri.parse(url));
     return WebViewWidget(
       key: _key,
       controller: _webViewController,
