@@ -9,6 +9,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
+import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -34,6 +37,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String? token;
   final String? appVersion;
   final bool? externalBrowserLogin;
+  final CidaasConfiguration? cidaasConfiguration;
 
   const FlutterAhaAuthentication({
     super.key,
@@ -49,6 +53,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.token,
     this.appVersion,
     this.externalBrowserLogin = false,
+    this.cidaasConfiguration,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -71,12 +76,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamLoginUrl;
   String? openiamToken;
 
+  late final CidaasAuthApi cidaasAuthApi;
+
   late String env = widget.environment;
   String url = kIsWeb ? html.window.location.href : '';
 
   late final apiUrl = {
     'development': 'https://dev.api.ahamatic.com',
-    'sandbox': 'https://test.api.ahamatic.com',
+    'sandbox': 'http://localhost:8080',
     'production': 'https://api-eu.ahamatic.com'
   }[env];
 
@@ -122,11 +129,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('''
-Page resource error:
-  Code: ${error.errorCode}
-  Description: ${error.description}
-  For URL: ${error.url}
-  ErrorType: ${error.errorType}
+              Page resource error:
+                Code: ${error.errorCode}
+                Description: ${error.description}
+                For URL: ${error.url}
+                ErrorType: ${error.errorType}
             ''');
           },
           onNavigationRequest: (NavigationRequest request) async {
@@ -159,6 +166,10 @@ Page resource error:
 
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
+    if (widget.cidaasConfiguration != null) {
+      cidaasAuthApi =
+          CidaasAuthApiImpl(FlutterAppAuth(), widget.cidaasConfiguration!);
+    }
   }
 
   Future<void> fetchData() async {
@@ -336,10 +347,8 @@ Page resource error:
           debugPrint('Login URL is null.');
         }
       } else {
-
         if (url != null) {
-          _webViewController
-              .loadRequest(Uri.parse(url));
+          _webViewController.loadRequest(Uri.parse(url));
         }
 
         kIsWeb
@@ -385,8 +394,7 @@ Page resource error:
                                       child: Stack(
                                         children: [
                                           if (url != null)
-                                            _buildWebView(
-                                                context),
+                                            _buildWebView(context),
                                           if (loadingPercentage < 100)
                                             const Center(
                                               child: CircularProgressIndicator(

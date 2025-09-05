@@ -20,6 +20,7 @@ dependencies:
   fluttertoast: ^8.2.8
   jwt_decoder: ^2.0.1
   device_info_plus: ^11.5.0
+  flutter_appauth: ^9.0.1
 
 dev_dependencies:
   flutter_test:

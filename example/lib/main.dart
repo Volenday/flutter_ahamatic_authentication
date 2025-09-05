@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
@@ -65,6 +66,21 @@ class _MyAppState extends State<MyApp> {
                 applicationCode: 'abenadata',
                 environment: environment,
                 europe: true,
+                cidaasConfiguration: CidaasConfiguration(
+                  clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
+                  issuer: 'https://abena-prod.cidaas.eu/',
+                  redirectUri: 'app://abenaRestock/oauth2redirect',
+                  postLogoutRedirectUri: 'app://abenaRestock/logout',
+                  discoveryUrl:
+                      'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
+                  scopes: [
+                    'openId',
+                    'profile',
+                    'email',
+                    'offline_access',
+                    'dk-cpr',
+                  ],
+                ),
               ),
             ),
           ),
