@@ -9,6 +9,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
@@ -18,7 +19,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:collection/collection.dart';
 import 'package:universal_html/html.dart' as html;
 
-enum LoginType { azure, mitId, openIAM }
+enum LoginType { azure, mitId, openIAM, cidaas }
 
 // ignore: must_be_immutable
 class FlutterAhaAuthentication extends StatefulWidget {
@@ -38,6 +39,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
   final String? appVersion;
   final bool? externalBrowserLogin;
   final CidaasConfiguration? cidaasConfiguration;
+  final AuthSuccessCallback? onAuthSuccess;
+  final AuthErrorCallback? onAuthError;
 
   const FlutterAhaAuthentication({
     super.key,
@@ -54,6 +57,8 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.appVersion,
     this.externalBrowserLogin = false,
     this.cidaasConfiguration,
+    this.onAuthSuccess,
+    this.onAuthError,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -69,6 +74,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String projectNameFromModule = '';
   bool refreshTokenFound = false;
   bool isOpeniamEnabled = false;
+  bool isCidaasEnabled = false;
   String openIAMLogo = '';
   String openIAMTitle = '';
   final _key = UniqueKey();
@@ -76,14 +82,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamLoginUrl;
   String? openiamToken;
 
-  late final CidaasAuthApi cidaasAuthApi;
-
+  late final CidaasConfiguration? _cidaasConfiguration;
   late String env = widget.environment;
   String url = kIsWeb ? html.window.location.href : '';
 
   late final apiUrl = {
     'development': 'https://dev.api.ahamatic.com',
-    'sandbox': 'http://localhost:8080',
+    'sandbox': 'https://test.api.ahamatic.com',
     'production': 'https://api-eu.ahamatic.com'
   }[env];
 
@@ -108,48 +113,57 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   @override
   void initState() {
     super.initState();
+    debugPrint('initState: Initializing state.');
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
+            debugPrint('onProgress: WebView loading: $progress%');
             setState(() {
               loadingPercentage = progress;
             });
           },
           onPageStarted: (String url) {
+            debugPrint('onPageStarted: Page started loading: $url');
             setState(() {
               loadingPercentage = 0;
             });
           },
           onPageFinished: (String url) {
+            debugPrint('onPageFinished: Page finished loading: $url');
             setState(() {
               loadingPercentage = 100;
             });
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('''
-              Page resource error:
-                Code: ${error.errorCode}
-                Description: ${error.description}
-                For URL: ${error.url}
-                ErrorType: ${error.errorType}
+Page resource error:
+  Code: ${error.errorCode}
+  Description: ${error.description}
+  For URL: ${error.url}
+  ErrorType: ${error.errorType}
             ''');
           },
           onNavigationRequest: (NavigationRequest request) async {
+            debugPrint('onNavigationRequest: Requesting URL: ${request.url}');
             Uri uri = Uri.parse(request.url);
 
             if (uri.queryParameters.containsKey('refreshToken')) {
+              debugPrint('onNavigationRequest: Found refreshToken in URL.');
               openiamToken = uri.queryParameters['token'];
 
               logs(openiamToken ?? '');
 
               if (await canLaunchUrl(uri)) {
+                debugPrint(
+                    'onNavigationRequest: Launching URL in external app: $uri');
                 await launchUrl(uri).then((_) {
                   if (!context.mounted) {
                     return;
                   }
-
+                  debugPrint(
+                      'onNavigationRequest: Popping dialog after URL launch.');
                   Navigator.pop(context);
                 });
               } else {
@@ -157,31 +171,38 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               }
               return NavigationDecision.prevent;
             }
+            debugPrint(
+                'onNavigationRequest: Navigating to URL: ${request.url}');
             return NavigationDecision.navigate;
           },
         ),
       );
 
+    _cidaasConfiguration = widget.cidaasConfiguration;
     WebViewCookieManager().clearCookies();
+    debugPrint('initState: Cleared WebView cookies.');
 
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
-    if (widget.cidaasConfiguration != null) {
-      cidaasAuthApi =
-          CidaasAuthApiImpl(FlutterAppAuth(), widget.cidaasConfiguration!);
-    }
   }
 
   Future<void> fetchData() async {
+    debugPrint('fetchData: Fetching application data.');
     try {
+      debugPrint('fetchData: Sending API request...');
+      debugPrint(
+          'API URL: $apiUrl/api/validate/app?value=${widget.applicationCode}');
       final response = await _dio
           .get('$apiUrl/api/validate/app?value=${widget.applicationCode}');
+      debugPrint('fetchData: API response status code: ${response.statusCode}');
+      debugPrint('JSON Data: ${response.data}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
+        debugPrint('fetchData: Successfully fetched JSON data.');
 
         List<dynamic> configurations = jsonData['Configurations'];
-
+        debugPrint('fetchData: Configurations: $configurations');
         Map<String, dynamic>? authConfig;
         for (var config in configurations) {
           if (config['Key'] == 'AuthConfig') {
@@ -189,29 +210,42 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             break;
           }
         }
+        debugPrint('fetchData: AuthConfig: $authConfig');
 
         if (authConfig != null && authConfig['Value'] is List<dynamic>) {
+          debugPrint('fetchData: Found AuthConfig.');
           Map<String, dynamic>? moduleConfig;
+          debugPrint('Widget moduleName: ${widget.moduleName}');
           for (var config in authConfig['Value']) {
             if (config['Module'] == widget.moduleName) {
               moduleConfig = config;
+              debugPrint(
+                  'fetchData: Found module config for ${widget.moduleName}.');
               break;
             }
           }
+          debugPrint('fetchData: ModuleConfig: $moduleConfig');
+
+          isCidaasEnabled = moduleConfig != null &&
+              moduleConfig['Portal Authentication']['Cidaas'] == true;
+          debugPrint('fetchData: Cidaas enabled status: $isCidaasEnabled');
 
           isOpeniamEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['OpenIAmAuth'] == true;
+          debugPrint('fetchData: OpenIAM enabled status: $isOpeniamEnabled');
 
           openIAMLogo = moduleConfig != null && isOpeniamEnabled
               ? moduleConfig['OpenIAMConfig']['logo']
               : '';
-
           openIAMTitle = moduleConfig != null && isOpeniamEnabled
               ? moduleConfig['OpenIAMConfig']['title']
               : '';
+          debugPrint(
+              'fetchData: OpenIAM logo: $openIAMLogo, title: $openIAMTitle');
         }
 
         final name = jsonData['Name'];
+        debugPrint('fetchData: Project name from module: $name');
 
         if (mounted) {
           setState(() {
@@ -219,6 +253,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           });
         }
       } else {
+        debugPrint(
+            'fetchData: Failed to load data with status code: ${response.statusCode}');
         throw Exception('Failed to load data');
       }
     } catch (e) {
@@ -227,6 +263,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   String? getOpenIAMLoginUrlFromJson(Map<String, dynamic> jsonData) {
+    debugPrint(
+        'getOpenIAMLoginUrlFromJson: Retrieving login URL for native app.');
     try {
       final bool isAndroid = Platform.isAndroid;
 
@@ -241,12 +279,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
           if (moduleConfig != null) {
             final openIAMHost = moduleConfig['HostName'];
-
             final scheme = isAndroid ? 'app://$openIAMHost' : '$openIAMHost://';
-
             final loginUrl =
                 '$ahaPortal/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
 
+            debugPrint(
+                'getOpenIAMLoginUrlFromJson: Generated login URL: $loginUrl');
             setState(() {
               openiamLoginUrl = loginUrl;
             });
@@ -257,11 +295,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     } catch (error) {
       debugPrint('Error retrieving OpenIAM login URL: $error');
     }
-
     return null;
   }
 
   String? getOpenIAMLoginForWeb(Map<String, dynamic> jsonData) {
+    debugPrint('getOpenIAMLoginForWeb: Retrieving login URL for web.');
     try {
       final configurations = jsonData['Configurations'] as List<dynamic>;
 
@@ -274,35 +312,35 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
           if (moduleConfig != null) {
             final openIAMHost = moduleConfig['HostName'];
-
             final uri = Uri.parse(url);
             final baseUrl = '${uri.scheme}://${uri.host}:${uri.port}';
-
             final callback =
                 url.contains('localhost') ? baseUrl : "https://$openIAMHost";
 
+            String loginUrl;
             if (widget.authenticationStatus == "unauthenticated") {
-              final loginUrl =
+              loginUrl =
                   "$ahaPortal/logout/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&logout=true";
-
-              return loginUrl;
+              debugPrint(
+                  'getOpenIAMLoginForWeb: Generated logout URL: $loginUrl');
             } else {
-              final loginUrl =
+              loginUrl =
                   '$ahaPortal/client/${widget.applicationCode}?redirect=$callback/callback?redirect=&origin=website&module=${widget.moduleWebName}';
-
-              return loginUrl;
+              debugPrint(
+                  'getOpenIAMLoginForWeb: Generated login URL: $loginUrl');
             }
+            return loginUrl;
           }
         }
       }
     } catch (error) {
       debugPrint('Error retrieving OpenIAM login URL: $error');
     }
-
     return null;
   }
 
   Future<String?> fetchLoginUrl(LoginType loginType) async {
+    debugPrint('fetchLoginUrl: Fetching login URL for type: $loginType');
     try {
       final response = await _dio
           .get('$apiUrl/api/validate/app?value=${widget.applicationCode}');
@@ -317,6 +355,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               : getOpenIAMLoginUrlFromJson(jsonData);
         }
 
+        debugPrint('fetchLoginUrl: Retrieved login URL: $loginUrl');
         return loginUrl;
       } else {
         debugPrint('Failed to fetch JSON data: ${response.statusCode}');
@@ -329,6 +368,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Widget _buildWebView(BuildContext context) {
+    debugPrint('_buildWebView: Building WebView widget.');
     return WebViewWidget(
       key: _key,
       controller: _webViewController,
@@ -337,17 +377,21 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Future<void> _launchLogin(BuildContext context, LoginType loginType) async {
+    debugPrint('_launchLogin: Attempting to launch login for type: $loginType');
     fetchLoginUrl(loginType).then((url) async {
       if (!context.mounted) return;
 
       if (widget.externalBrowserLogin == true) {
+        debugPrint('_launchLogin: Using external browser for login.');
         if (url != null) {
+          debugPrint('_launchLogin: Launching URL externally: $url');
           await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         } else {
           debugPrint('Login URL is null.');
         }
       } else {
         if (url != null) {
+          debugPrint('_launchLogin: Loading URL in WebView: $url');
           _webViewController.loadRequest(Uri.parse(url));
         }
 
@@ -357,6 +401,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 context: context,
                 barrierDismissible: false,
                 builder: (BuildContext context) {
+                  debugPrint('_launchLogin: Showing WebView dialog.');
                   return StatefulBuilder(
                     builder: (context, setState) {
                       return Scaffold(
@@ -374,7 +419,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               content: Column(
                                 children: [
                                   GestureDetector(
-                                    onTap: () => Navigator.pop(context),
+                                    onTap: () {
+                                      debugPrint('Closing login dialog.');
+                                      Navigator.pop(context);
+                                    },
                                     child: const Align(
                                       alignment: Alignment.topRight,
                                       child: Icon(
@@ -419,23 +467,93 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     });
   }
 
+  // _launchCidaasLogin()
+  Future<void> _launchCidaasLogin() async {
+    debugPrint('_launchCidaasLogin: Initiating Cidaas login flow.');
+
+    final CidaasConfiguration? config = widget.cidaasConfiguration;
+    if (config == null) {
+      debugPrint('Error: CidaasConfiguration not provided.');
+      // Llama al callback de error si la configuración no existe
+      if (widget.onAuthError != null) {
+        widget.onAuthError!('Cidaas configuration not provided.');
+      }
+      return;
+    }
+
+    try {
+      final cidaasAuthApi = CidaasAuthApiImpl(
+        const FlutterAppAuth(),
+        config,
+      );
+
+      final TokenResponse tokenResponse =
+          await cidaasAuthApi.signInWithCidaas();
+
+      if (tokenResponse.accessToken != null) {
+        debugPrint('_launchCidaasLogin: Login successful!');
+
+        // Llama al callback de éxito que el cliente pasó
+        if (widget.onAuthSuccess != null) {
+          widget.onAuthSuccess!(
+            accessToken: tokenResponse.accessToken,
+            refreshToken: tokenResponse.refreshToken,
+            idToken: tokenResponse.idToken,
+          );
+        }
+
+        // Ya que el login fue exitoso, puedes cerrar el diálogo de login si es que se abrió uno.
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      } else {
+        debugPrint('_launchCidaasLogin: Login failed, no access token.');
+        // Llama al callback de error
+        if (widget.onAuthError != null) {
+          widget.onAuthError!('Login failed, no access token.');
+        }
+      }
+    } on PlatformException catch (e) {
+      debugPrint('CidaasAuthApi: PlatformException: ${e.message}');
+      // Llama al callback de error en caso de excepción
+      if (widget.onAuthError != null) {
+        widget.onAuthError!(e.message ?? 'An unknown platform error occurred.');
+      }
+    } catch (e) {
+      debugPrint('CidaasAuthApi: An unexpected error occurred: $e');
+      // Llama al callback de error en caso de excepción inesperada
+      if (widget.onAuthError != null) {
+        widget.onAuthError!('An unexpected error occurred: $e');
+      }
+    }
+  }
+
   Future<void> logs(String token) async {
+    debugPrint('logs: Sending log data to API.');
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
 
     String deviceModel = '';
 
-    if (Platform.isAndroid) {
-      AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-      deviceModel = androidInfo.model;
-    } else if (Platform.isIOS) {
-      IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-      deviceModel = iosInfo.model;
+    try {
+      if (Platform.isAndroid) {
+        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        deviceModel = androidInfo.model;
+        debugPrint('logs: Device model (Android): $deviceModel');
+      } else if (Platform.isIOS) {
+        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        deviceModel = iosInfo.model;
+        debugPrint('logs: Device model (iOS): $deviceModel');
+      }
+    } catch (e) {
+      debugPrint('logs: Error getting device info: $e');
     }
 
     _dio.options.headers['authorization'] = token;
+    debugPrint('logs: Setting authorization header with token.');
 
     final Map<String, dynamic> tokenDecode = JwtDecoder.decode(token);
     final int personId = tokenDecode['account']['PersonId'];
+    debugPrint('logs: Decoded PersonId from token: $personId');
 
     final params = {
       "Action": "Abena Id Login Button Tapped",
@@ -446,17 +564,23 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       "Device": deviceModel,
     };
 
-    final response = await _dio.post('$apiUrl/api/e/_logs', data: params);
-
-    if (response.statusCode == 200) {
-      debugPrint('Logs: ${response.data}');
-    } else {
-      debugPrint('Failed to fetch logs: ${response.statusCode}');
+    try {
+      final response = await _dio.post('$apiUrl/api/e/_logs', data: params);
+      if (response.statusCode == 200) {
+        debugPrint('Logs: Successfully sent logs. Response: ${response.data}');
+      } else {
+        debugPrint('Failed to send logs: ${response.statusCode}');
+      }
+    } on DioError catch (e) {
+      debugPrint('Dio Error when sending logs: ${e.message}');
+    } catch (e) {
+      debugPrint('Error when sending logs: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('build: Building widget tree.');
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     bool isPhone = MediaQuery.of(context).size.width < 600;
@@ -474,6 +598,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                 ),
               ),
               onPressed: () {
+                debugPrint('Login button pressed.');
                 _launchLogin(context, LoginType.openIAM);
               },
               child: Text('Log in',
@@ -523,21 +648,30 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
+                                  if (isCidaasEnabled)
+                                    _SignInAlternatives(
+                                      name: 'Cidaas',
+                                      logo:
+                                          'https://cidaas.com/wp-content/uploads/2020/11/cropped-cidaas-logo-1.png',
+                                      onPressed: () {
+                                        debugPrint('Cidaas button pressed.');
+                                        _launchCidaasLogin();
+                                      },
+                                    ),
                                   if (isOpeniamEnabled)
                                     _SignInAlternatives(
                                         name: openIAMTitle,
                                         logo: openIAMLogo,
                                         onPressed: () {
+                                          debugPrint('OpenIAM button pressed.');
                                           if (widget.environment !=
                                               'production') {
                                             SnackBar snackBar = SnackBar(
                                                 content:
                                                     Text('$openiamLoginUrl'));
-
                                             ScaffoldMessenger.of(context)
                                                 .showSnackBar(snackBar);
                                           }
-
                                           _launchLogin(
                                               context, LoginType.openIAM);
                                         }),
@@ -545,8 +679,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
                                     _SignInAlternatives(
                                       name: 'Google',
                                       logo: 'google',
-                                      onPressed:
-                                          widget.onPressedGoogleLogin ?? () {},
+                                      onPressed: () {
+                                        debugPrint(
+                                            'Google login button pressed.');
+                                        widget.onPressedGoogleLogin!();
+                                      },
                                     ),
                                 ],
                               )
@@ -572,6 +709,7 @@ class _SignInAlternatives extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('build: Building _SignInAlternatives widget for $name.');
     bool isPhone = MediaQuery.of(context).size.width < 600;
 
     return Column(
@@ -593,8 +731,15 @@ class _SignInAlternatives extends StatelessWidget {
             padding: const EdgeInsets.all(10),
             child: CachedNetworkImage(
               imageUrl: logo,
-              placeholder: (context, url) => const CircularProgressIndicator(),
-              errorWidget: (context, url, error) => const Icon(Icons.error),
+              placeholder: (context, url) {
+                debugPrint('CachedNetworkImage: Placeholder for $url.');
+                return const CircularProgressIndicator();
+              },
+              errorWidget: (context, url, error) {
+                debugPrint(
+                    'CachedNetworkImage: Error loading image from $url. Error: $error');
+                return const Icon(Icons.error);
+              },
             ),
           ),
         ),

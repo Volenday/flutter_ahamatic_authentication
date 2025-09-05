@@ -15,3 +15,11 @@ class CidaasConfiguration {
     required this.scopes,
   });
 }
+
+typedef AuthSuccessCallback = void Function({
+  String? accessToken,
+  String? refreshToken,
+  String? idToken,
+});
+
+typedef AuthErrorCallback = void Function(String errorMessage);

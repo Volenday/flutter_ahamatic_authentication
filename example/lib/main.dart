@@ -45,6 +45,37 @@ class _MyAppState extends State<MyApp> {
   String? refreshToken;
   User? user;
 
+  String? _accessToken;
+  String? _refreshToken;
+  String? _idToken;
+
+  // Callback function for a successful authentication
+  void _handleAuthSuccess({
+    String? accessToken,
+    String? refreshToken,
+    String? idToken,
+  }) {
+    setState(() {
+      _accessToken = accessToken;
+      _refreshToken = refreshToken;
+      _idToken = idToken;
+    });
+
+    // You can add your logic here. For example, navigate to a new screen or save the tokens.
+    debugPrint('Autenticación exitosa. Access Token: $_accessToken');
+    debugPrint('Refresh Token: $_refreshToken');
+    debugPrint('ID Token: $_idToken');
+  }
+
+  // Callback function for an authentication error
+  void _handleAuthError(String errorMessage) {
+    // You can display an error message to the user here.
+    debugPrint('Error de autenticación: $errorMessage');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error de autenticación: $errorMessage')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -64,8 +95,10 @@ class _MyAppState extends State<MyApp> {
                 moduleWebName: 'b2bScannerWeb',
                 projectLogoAsset: 'assets/images/sample_logo.png',
                 applicationCode: 'abenadata',
-                environment: environment,
+                environment: 'production',
                 europe: true,
+                onAuthSuccess: _handleAuthSuccess,
+                onAuthError: _handleAuthError,
                 cidaasConfiguration: CidaasConfiguration(
                   clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
                   issuer: 'https://abena-prod.cidaas.eu/',
@@ -74,7 +107,7 @@ class _MyAppState extends State<MyApp> {
                   discoveryUrl:
                       'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
                   scopes: [
-                    'openId',
+                    'openid',
                     'profile',
                     'email',
                     'offline_access',
