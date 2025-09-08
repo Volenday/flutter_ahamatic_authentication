@@ -219,6 +219,8 @@ Page resource error:
     try {
       final bool isAndroid = Platform.isAndroid;
 
+      final bool isIOS = Platform.isIOS;
+
       final configurations = jsonData['Configurations'] as List<dynamic>;
 
       for (final config in configurations) {
@@ -231,7 +233,8 @@ Page resource error:
           if (moduleConfig != null) {
             final openIAMHost = moduleConfig['HostName'];
 
-            final scheme = isAndroid ? 'app://$openIAMHost' : '$openIAMHost://';
+            final scheme =
+                (isAndroid || isIOS) ? 'app://$openIAMHost' : '$openIAMHost://';
 
             final loginUrl =
                 '$ahaPortal/client/${widget.applicationCode}?redirect=$scheme/callback&origin=website&module=${widget.moduleName}';
@@ -336,10 +339,8 @@ Page resource error:
           debugPrint('Login URL is null.');
         }
       } else {
-
         if (url != null) {
-          _webViewController
-              .loadRequest(Uri.parse(url));
+          _webViewController.loadRequest(Uri.parse(url));
         }
 
         kIsWeb
@@ -385,8 +386,7 @@ Page resource error:
                                       child: Stack(
                                         children: [
                                           if (url != null)
-                                            _buildWebView(
-                                                context),
+                                            _buildWebView(context),
                                           if (loadingPercentage < 100)
                                             const Center(
                                               child: CircularProgressIndicator(
