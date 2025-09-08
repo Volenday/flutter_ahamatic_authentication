@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
 
 import 'dart:async';
 import 'dart:io';
@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_ahamatic_authentication/cidaas/cidaas.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
@@ -82,7 +82,6 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? openiamLoginUrl;
   String? openiamToken;
 
-  late final CidaasConfiguration? _cidaasConfiguration;
   late String env = widget.environment;
   String url = kIsWeb ? html.window.location.href : '';
 
@@ -178,7 +177,6 @@ Page resource error:
         ),
       );
 
-    _cidaasConfiguration = widget.cidaasConfiguration;
     WebViewCookieManager().clearCookies();
     debugPrint('initState: Cleared WebView cookies.');
 
@@ -190,19 +188,15 @@ Page resource error:
     debugPrint('fetchData: Fetching application data.');
     try {
       debugPrint('fetchData: Sending API request...');
-      debugPrint(
-          'API URL: $apiUrl/api/validate/app?value=${widget.applicationCode}');
       final response = await _dio
           .get('$apiUrl/api/validate/app?value=${widget.applicationCode}');
       debugPrint('fetchData: API response status code: ${response.statusCode}');
-      debugPrint('JSON Data: ${response.data}');
 
       if (response.statusCode == 200) {
         final jsonData = response.data;
         debugPrint('fetchData: Successfully fetched JSON data.');
 
         List<dynamic> configurations = jsonData['Configurations'];
-        debugPrint('fetchData: Configurations: $configurations');
         Map<String, dynamic>? authConfig;
         for (var config in configurations) {
           if (config['Key'] == 'AuthConfig') {
@@ -210,12 +204,10 @@ Page resource error:
             break;
           }
         }
-        debugPrint('fetchData: AuthConfig: $authConfig');
 
         if (authConfig != null && authConfig['Value'] is List<dynamic>) {
           debugPrint('fetchData: Found AuthConfig.');
           Map<String, dynamic>? moduleConfig;
-          debugPrint('Widget moduleName: ${widget.moduleName}');
           for (var config in authConfig['Value']) {
             if (config['Module'] == widget.moduleName) {
               moduleConfig = config;
@@ -224,7 +216,6 @@ Page resource error:
               break;
             }
           }
-          debugPrint('fetchData: ModuleConfig: $moduleConfig');
 
           isCidaasEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['Cidaas'] == true;
@@ -651,8 +642,7 @@ Page resource error:
                                   if (isCidaasEnabled)
                                     _SignInAlternatives(
                                       name: 'Cidaas',
-                                      logo:
-                                          'https://cidaas.com/wp-content/uploads/2020/11/cropped-cidaas-logo-1.png',
+                                      logo: 'assets/cidaas/cidaas_logo.png',
                                       onPressed: () {
                                         debugPrint('Cidaas button pressed.');
                                         _launchCidaasLogin();

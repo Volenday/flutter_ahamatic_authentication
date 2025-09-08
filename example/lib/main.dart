@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ahamatic_authentication/cidaas/cidaas.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 
 // config
