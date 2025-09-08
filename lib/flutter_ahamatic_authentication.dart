@@ -492,11 +492,6 @@ Page resource error:
             idToken: tokenResponse.idToken,
           );
         }
-
-        // Ya que el login fue exitoso, puedes cerrar el diálogo de login si es que se abrió uno.
-        if (context.mounted) {
-          Navigator.of(context).pop();
-        }
       } else {
         debugPrint('_launchCidaasLogin: Login failed, no access token.');
         // Llama al callback de error
