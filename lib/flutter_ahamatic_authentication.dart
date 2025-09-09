@@ -723,6 +723,14 @@ class _SignInAlternatives extends StatelessWidget {
               errorWidget: (context, url, error) {
                 debugPrint(
                     'CachedNetworkImage: Error loading image from $url. Error: $error');
+                if (logo.startsWith('assets/')) {
+                  return Image.asset(
+                    logo,
+                    width: isPhone ? 50 : 60,
+                    height: isPhone ? 50 : 60,
+                    fit: BoxFit.contain,
+                  );
+                }
                 return const Icon(Icons.error);
               },
             ),
