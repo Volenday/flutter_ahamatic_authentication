@@ -637,7 +637,8 @@ Page resource error:
                                   if (isCidaasEnabled)
                                     _SignInAlternatives(
                                       name: 'Cidaas',
-                                      logo: 'assets/cidaas/cidaas_logo.png',
+                                      logo:
+                                          'https://brandfetch.com/cidaas.com?view=library&library=default&collection=logos&asset=idSp1mW6xT&utm_source=https%253A%252F%252Fbrandfetch.com%252Fcidaas.com&utm_medium=copyAction&utm_campaign=brandPageReferral',
                                       onPressed: () {
                                         debugPrint('Cidaas button pressed.');
                                         _launchCidaasLogin();
