@@ -5,6 +5,7 @@ class CidaasConfiguration {
   final String postLogoutRedirectUri;
   final String discoveryUrl;
   final List<String> scopes;
+  final Map<String, String>? customParameter;
 
   CidaasConfiguration({
     required this.clientId,
@@ -13,6 +14,19 @@ class CidaasConfiguration {
     required this.postLogoutRedirectUri,
     required this.discoveryUrl,
     required this.scopes,
+    this.customParameter,
+  });
+}
+
+class AhamaticResponse {
+  final String? accessToken;
+  final String? refreshToken;
+  final String? idToken;
+
+  AhamaticResponse({
+    this.accessToken,
+    this.refreshToken,
+    this.idToken,
   });
 }
 

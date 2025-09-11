@@ -91,6 +91,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     'production': 'https://api-eu.ahamatic.com'
   }[env];
 
+  late final apiURLTEST = 'http://localhost:8080';
+
   late final ahaPortal = widget.europe
       ? {
           'development': 'https://dev.auth-eu.ahamatic.com',
@@ -197,6 +199,7 @@ Page resource error:
         debugPrint('fetchData: Successfully fetched JSON data.');
 
         List<dynamic> configurations = jsonData['Configurations'];
+        debugPrint('fetchData: Found ${configurations} configurations.');
         Map<String, dynamic>? authConfig;
         for (var config in configurations) {
           if (config['Key'] == 'AuthConfig') {
@@ -474,6 +477,7 @@ Page resource error:
 
     try {
       final cidaasAuthApi = CidaasAuthApiImpl(
+        _dio,
         const FlutterAppAuth(),
         config,
       );
@@ -483,6 +487,14 @@ Page resource error:
 
       if (tokenResponse.accessToken != null) {
         debugPrint('_launchCidaasLogin: Login successful!');
+
+        final ahamaticResponse = await cidaasAuthApi.fetchAhamaticTokens(
+          tokenResponse.accessToken!,
+          apiURLTEST,
+        );
+
+        debugPrint(
+            '_launchCidaasLogin: Fetched Ahamatic tokens, $ahamaticResponse');
 
         // Llama al callback de éxito que el cliente pasó
         if (widget.onAuthSuccess != null) {

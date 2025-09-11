@@ -60,11 +60,6 @@ class _MyAppState extends State<MyApp> {
       _refreshToken = refreshToken;
       _idToken = idToken;
     });
-
-    // You can add your logic here. For example, navigate to a new screen or save the tokens.
-    debugPrint('Autenticación exitosa. Access Token: $_accessToken');
-    debugPrint('Refresh Token: $_refreshToken');
-    debugPrint('ID Token: $_idToken');
   }
 
   // Callback function for an authentication error

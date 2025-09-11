@@ -1,7 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 
 abstract interface class CidaasAuthApi {
   Future<TokenResponse> signInWithCidaas();
@@ -10,8 +11,13 @@ abstract interface class CidaasAuthApi {
 class CidaasAuthApiImpl implements CidaasAuthApi {
   final FlutterAppAuth _appAuth;
   final CidaasConfiguration config;
+  final Dio _dio;
 
-  CidaasAuthApiImpl(this._appAuth, this.config);
+  CidaasAuthApiImpl(
+    this._dio,
+    this._appAuth,
+    this.config,
+  );
 
   @override
   Future<TokenResponse> signInWithCidaas() async {
@@ -58,6 +64,9 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         codeVerifier: authResponse.codeVerifier,
         nonce: authResponse.nonce,
         allowInsecureConnections: true,
+        additionalParameters: {
+          'code_challenge_method': 'S256',
+        },
       );
 
       debugPrint(
@@ -98,6 +107,53 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       throw PlatformException(
         code: 'unexpected_error',
         message: 'An unexpected error occurred during sign in: $e',
+        details: null,
+        stacktrace: stack.toString(),
+      );
+    }
+  }
+
+  // Necesitamos hacer una llamada a ahamatic para validar la información y enviar los nuevos tokens al cliente
+  Future<AhamaticResponse> fetchAhamaticTokens(
+    String accessToken,
+    String apiUrl,
+  ) async {
+    if (kDebugMode) {
+      debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
+      debugPrint('CidaasAuthApi: Access Token: $accessToken');
+      debugPrint('CidaasAuthApi: API URL: $apiUrl');
+    }
+
+    if (accessToken.isEmpty || apiUrl.isEmpty) {
+      throw ArgumentError('Access token and API URL must not be null or empty');
+    }
+
+    try {
+      final response = await _dio.post(
+        '$apiUrl/api/auth/cidaas',
+        data: {
+          'apiKey': '',
+          'access_token': accessToken,
+          'clientId': '',
+          'redirectUrl': '',
+        },
+      );
+      if (kDebugMode) {
+        debugPrint('CidaasAuthApi: Ahamatic token response: ${response.data}');
+      }
+      return AhamaticResponse(
+        accessToken: response.data['access_token'],
+        refreshToken: response.data['refresh_token'],
+        idToken: response.data['id_token'],
+      );
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('CidaasAuthApi: Error fetching Ahamatic tokens: $e');
+        debugPrint('CidaasAuthApi: Stack trace: $stack');
+      }
+      throw PlatformException(
+        code: 'ahamatic_token_error',
+        message: 'Error fetching Ahamatic tokens: $e',
         details: null,
         stacktrace: stack.toString(),
       );
