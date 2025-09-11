@@ -72,6 +72,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
 class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   final _dio = Dio();
   String projectNameFromModule = '';
+  String apiKey = '';
   bool refreshTokenFound = false;
   bool isOpeniamEnabled = false;
   bool isCidaasEnabled = false;
@@ -199,7 +200,7 @@ Page resource error:
         debugPrint('fetchData: Successfully fetched JSON data.');
 
         List<dynamic> configurations = jsonData['Configurations'];
-        debugPrint('fetchData: Found ${configurations} configurations.');
+
         Map<String, dynamic>? authConfig;
         for (var config in configurations) {
           if (config['Key'] == 'AuthConfig') {
@@ -219,6 +220,11 @@ Page resource error:
               break;
             }
           }
+
+          debugPrint('fetchData: Module config: $moduleConfig');
+
+          apiKey = authConfig != null ? authConfig['ApplicationId'] ?? '' : '';
+          debugPrint('fetchData: ApplicationId from AuthConfig: $apiKey');
 
           isCidaasEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['Cidaas'] == true;
@@ -491,6 +497,7 @@ Page resource error:
         final ahamaticResponse = await cidaasAuthApi.fetchAhamaticTokens(
           tokenResponse.accessToken!,
           apiURLTEST,
+          apiKey,
         );
 
         debugPrint(

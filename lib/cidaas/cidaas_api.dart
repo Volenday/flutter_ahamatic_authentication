@@ -117,15 +117,18 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
   Future<AhamaticResponse> fetchAhamaticTokens(
     String accessToken,
     String apiUrl,
+    String apiKey,
   ) async {
     if (kDebugMode) {
       debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
       debugPrint('CidaasAuthApi: Access Token: $accessToken');
       debugPrint('CidaasAuthApi: API URL: $apiUrl');
+      debugPrint('CidaasAuthApi: API Key: $apiKey');
     }
 
-    if (accessToken.isEmpty || apiUrl.isEmpty) {
-      throw ArgumentError('Access token and API URL must not be null or empty');
+    if (accessToken.isEmpty || apiUrl.isEmpty || apiKey.isEmpty) {
+      throw ArgumentError(
+          'Access token, API URL, and API Key must not be null or empty');
     }
 
     try {
@@ -134,7 +137,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         data: {
           'apiKey': '',
           'access_token': accessToken,
-          'clientId': '',
+          'clientId': config.clientId,
           'redirectUrl': '',
         },
       );
