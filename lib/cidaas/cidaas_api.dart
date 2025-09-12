@@ -136,7 +136,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
           'apiKey': apiKey,
           'access_token': accessToken,
           'clientId': config.clientId,
-          'redirectUrl': '',
+          'redirectUrl': 'test',
         },
       );
       debugPrint('CidaasAuthApi: Ahamatic token response: ${response.data}');
