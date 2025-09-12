@@ -119,12 +119,10 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
     String apiUrl,
     String apiKey,
   ) async {
-    if (kDebugMode) {
-      debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
-      debugPrint('CidaasAuthApi: Access Token: $accessToken');
-      debugPrint('CidaasAuthApi: API URL: $apiUrl');
-      debugPrint('CidaasAuthApi: API Key: $apiKey');
-    }
+    debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
+    debugPrint('CidaasAuthApi: Access Token: $accessToken');
+    debugPrint('CidaasAuthApi: API URL: $apiUrl');
+    debugPrint('CidaasAuthApi: API Key: $apiKey');
 
     if (accessToken.isEmpty || apiUrl.isEmpty || apiKey.isEmpty) {
       throw ArgumentError(
@@ -141,9 +139,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
           'redirectUrl': '',
         },
       );
-      if (kDebugMode) {
-        debugPrint('CidaasAuthApi: Ahamatic token response: ${response.data}');
-      }
+      debugPrint('CidaasAuthApi: Ahamatic token response: ${response.data}');
       return AhamaticResponse(
         accessToken: response.data['access_token'],
         refreshToken: response.data['refresh_token'],
