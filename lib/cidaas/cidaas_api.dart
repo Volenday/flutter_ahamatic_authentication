@@ -133,7 +133,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       final response = await _dio.post(
         '$apiUrl/api/auth/cidaas',
         data: {
-          'apiKey': '',
+          'apiKey': apiKey,
           'access_token': accessToken,
           'clientId': config.clientId,
           'redirectUrl': '',
