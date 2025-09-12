@@ -223,8 +223,13 @@ Page resource error:
 
           debugPrint('fetchData: Module config: $moduleConfig');
 
-          apiKey = authConfig != null ? authConfig['ApplicationId'] ?? '' : '';
-          debugPrint('fetchData: ApplicationId from AuthConfig: $apiKey');
+          // Extrae apiKey correctamente desde moduleConfig si existe
+          apiKey = moduleConfig != null &&
+                  moduleConfig['Cidaas'] != null &&
+                  moduleConfig['Cidaas']['apiKey'] != null
+              ? moduleConfig['Cidaas']['apiKey']
+              : '';
+          debugPrint('fetchData: Cidaas apiKey from moduleConfig: $apiKey');
 
           isCidaasEnabled = moduleConfig != null &&
               moduleConfig['Portal Authentication']['Cidaas'] == true;
