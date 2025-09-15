@@ -5,7 +5,7 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 
 abstract interface class CidaasAuthApi {
-  Future<TokenResponse> signInWithCidaas();
+  Future<TokenResponse> signInWithCidaas(String apikey, String apiUrl);
 }
 
 class CidaasAuthApiImpl implements CidaasAuthApi {
@@ -20,7 +20,10 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
   );
 
   @override
-  Future<TokenResponse> signInWithCidaas() async {
+  Future<TokenResponse> signInWithCidaas(
+    String apikey,
+    String apiUrl,
+  ) async {
     if (kDebugMode) {
       debugPrint('CidaasAuthApi: Starting sign-in process...');
       debugPrint('CidaasAuthApi: Client ID: ${config.clientId}');
@@ -78,6 +81,10 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       debugPrint('CidaasAuthApi: Token exchange successful!');
 
+      debugPrint('CidaasAuthApi: Starting Ahamatic token fetch...');
+
+      final ahamaticResponse =
+          await fetchAhamaticTokens(tokenResponse.accessToken!, apiUrl, apikey);
       return tokenResponse;
     } on PlatformException catch (e, stack) {
       debugPrint(

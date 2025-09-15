@@ -493,20 +493,13 @@ Page resource error:
         config,
       );
 
-      final TokenResponse tokenResponse =
-          await cidaasAuthApi.signInWithCidaas();
+      final TokenResponse tokenResponse = await cidaasAuthApi.signInWithCidaas(
+        apiKey,
+        apiURLTEST,
+      );
 
       if (tokenResponse.accessToken != null) {
         debugPrint('_launchCidaasLogin: Login successful!');
-
-        final ahamaticResponse = await cidaasAuthApi.fetchAhamaticTokens(
-          tokenResponse.accessToken!,
-          apiURLTEST,
-          apiKey,
-        );
-
-        debugPrint(
-            '_launchCidaasLogin: Fetched Ahamatic tokens, $ahamaticResponse');
 
         // Llama al callback de éxito que el cliente pasó
         if (widget.onAuthSuccess != null) {
