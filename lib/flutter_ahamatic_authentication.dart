@@ -101,61 +101,63 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   @override
   void initState() {
     super.initState();
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (int progress) {
-            setState(() {
-              loadingPercentage = progress;
-            });
-          },
-          onPageStarted: (String url) {
-            setState(() {
-              loadingPercentage = 0;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              loadingPercentage = 100;
-            });
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint('''
+
+    if (!kIsWeb) {
+      _webViewController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onProgress: (int progress) {
+              setState(() {
+                loadingPercentage = progress;
+              });
+            },
+            onPageStarted: (String url) {
+              setState(() {
+                loadingPercentage = 0;
+              });
+            },
+            onPageFinished: (String url) {
+              setState(() {
+                loadingPercentage = 100;
+              });
+            },
+            onWebResourceError: (WebResourceError error) {
+              debugPrint('''
 Page resource error:
   Code: ${error.errorCode}
   Description: ${error.description}
   For URL: ${error.url}
   ErrorType: ${error.errorType}
             ''');
-          },
-          onNavigationRequest: (NavigationRequest request) async {
-            Uri uri = Uri.parse(request.url);
+            },
+            onNavigationRequest: (NavigationRequest request) async {
+              Uri uri = Uri.parse(request.url);
 
-            if (uri.queryParameters.containsKey('refreshToken')) {
-              openiamToken = uri.queryParameters['token'];
+              if (uri.queryParameters.containsKey('refreshToken')) {
+                openiamToken = uri.queryParameters['token'];
 
-              logs(openiamToken ?? '');
+                logs(openiamToken ?? '');
 
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri).then((_) {
-                  if (!context.mounted) {
-                    return;
-                  }
-
-                  Navigator.pop(context);
-                });
-              } else {
-                debugPrint('Could not launch $uri');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri).then((_) {
+                    if (!context.mounted) {
+                      return;
+                    }
+                    Navigator.pop(context);
+                  });
+                } else {
+                  debugPrint('Could not launch $uri');
+                }
+                return NavigationDecision.prevent;
               }
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
-      );
+              return NavigationDecision.navigate;
+            },
+          ),
+        );
 
-    WebViewCookieManager().clearCookies();
+      WebViewCookieManager().clearCookies();
+    }
 
     fetchData();
     fetchLoginUrl(LoginType.openIAM);
