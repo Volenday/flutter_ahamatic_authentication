@@ -85,7 +85,22 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       final ahamaticResponse =
           await fetchAhamaticTokens(tokenResponse.accessToken!, apiUrl, apikey);
-      return tokenResponse;
+
+      debugPrint('CidaasAuthApi: Ahamatic tokens fetched successfully!');
+
+      debugPrint('CidaasAuthApi: ahamaticResponse: $ahamaticResponse');
+
+      final ahamaticTokenResponse = TokenResponse(
+        ahamaticResponse.accessToken,
+        ahamaticResponse.refreshToken,
+        null, // accessTokenExpirationDateTime
+        ahamaticResponse.idToken,
+        null, // tokenType
+        null, // scopes
+        null, // tokenAdditionalParameters
+      );
+
+      return ahamaticTokenResponse;
     } on PlatformException catch (e, stack) {
       debugPrint(
           'CidaasAuthApi: PlatformException during sign-in: ${e.code} - ${e.message}');
