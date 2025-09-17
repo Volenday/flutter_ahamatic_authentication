@@ -92,7 +92,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     'production': 'https://api-eu.ahamatic.com'
   }[env];
 
-  late final apiURLTEST = 'http://10.0.2.2:8080';
+  late final apiURLTEST = 'https://test.api.ahamatic.com';
 
   late final ahaPortal = widget.europe
       ? {
