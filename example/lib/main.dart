@@ -20,7 +20,6 @@ const ahaPortal = {
 
 final apiURL = ahaAPI[environment] as String;
 final portalURL = ahaPortal[environment] as String;
-const apiKey = '5740ed00-f13b-11ec-b42f-3bd642eee790';
 final dio = Dio();
 
 Map<String, String>? initialQueryParameters;
