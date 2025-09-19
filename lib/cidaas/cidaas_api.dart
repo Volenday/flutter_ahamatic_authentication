@@ -12,17 +12,14 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
   final FlutterAppAuth _appAuth;
   final CidaasConfiguration config;
   final Dio _dio;
+  final Map<String, String> devAccount;
 
-  CidaasAuthApiImpl(
-    this._dio,
-    this._appAuth,
-    this.config,
-  );
+  CidaasAuthApiImpl(this._dio, this._appAuth, this.config, this.devAccount);
 
   @override
   Future<TokenResponse> signInWithCidaas(
     String apikey,
-    String apiUrl,
+    String? apiUrl,
   ) async {
     if (kDebugMode) {
       debugPrint('CidaasAuthApi: Starting sign-in process...');
@@ -83,11 +80,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       debugPrint('CidaasAuthApi: Login in ahamatic...');
 
-      final ahamaticLoginResponse = await loginEmailAhamatic(
-        apikey,
-        'developers@volenday.com',
-        'V0l3nd@yP@ssw0rd',
-      );
+      final ahamaticLoginResponse = await loginEmailAhamatic(apikey);
 
       debugPrint(
           'CidaasAuthApi: Ahamatic login response: $ahamaticLoginResponse');
@@ -152,10 +145,10 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
   Future<String> loginEmailAhamatic(
     String apiKey,
-    String emailAddress,
-    String password,
   ) async {
-    if (apiKey.isEmpty || emailAddress.isEmpty || password.isEmpty) {
+    if (apiKey.isEmpty ||
+        devAccount['emailAddress']!.isEmpty ||
+        devAccount['password']!.isEmpty) {
       throw ArgumentError(
           'API Key, email address, and password must not be null or empty');
     }
@@ -165,8 +158,8 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         'https://dev.api.ahamatic.com/api/auth/email',
         data: {
           "apiKey": apiKey,
-          "emailAddress": emailAddress,
-          "password": password,
+          "emailAddress": devAccount['emailAddress'],
+          "password": devAccount['password'],
         },
       );
       debugPrint('CidaasAuthApi: Login email response: ${response.data}');
@@ -198,7 +191,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
   // Necesitamos hacer una llamada a ahamatic para validar la información y enviar los nuevos tokens al cliente
   Future<AhamaticResponse> fetchAhamaticTokens(
     String accessToken,
-    String apiUrl,
+    String? apiUrl,
     String apiKey,
     String ahamatictoken,
   ) async {
@@ -209,7 +202,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
     debugPrint('CidaasAuthApi: Token: $ahamatictoken');
 
     if (accessToken.isEmpty ||
-        apiUrl.isEmpty ||
+        apiUrl == null ||
         apiKey.isEmpty ||
         ahamatictoken.isEmpty) {
       throw ArgumentError(

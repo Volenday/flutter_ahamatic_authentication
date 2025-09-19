@@ -92,7 +92,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     'production': 'https://api-eu.ahamatic.com'
   }[env];
 
-  late final apiURLTEST = 'http://10.0.2.2:8080';
+  late final devAccount = {
+    'emailAddress': 'developers@volenday.com',
+    'password': 'V0l3nd@yP@ssw0rd',
+  };
 
   late final ahaPortal = widget.europe
       ? {
@@ -491,11 +494,12 @@ Page resource error:
         _dio,
         const FlutterAppAuth(),
         config,
+        devAccount,
       );
 
       final TokenResponse tokenResponse = await cidaasAuthApi.signInWithCidaas(
         apiKey,
-        apiURLTEST,
+        apiUrl,
       );
 
       if (tokenResponse.accessToken != null) {
