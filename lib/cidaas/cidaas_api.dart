@@ -81,6 +81,17 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       debugPrint('CidaasAuthApi: Token exchange successful!');
 
+      debugPrint('CidaasAuthApi: Login in ahamatic...');
+
+      final ahamaticLoginResponse = await loginEmailAhamatic(
+        apikey,
+        'developers@volenday.com',
+        'V0l3nd@yP@ssw0rd',
+      );
+
+      debugPrint(
+          'CidaasAuthApi: Ahamatic login response: $ahamaticLoginResponse');
+
       debugPrint('CidaasAuthApi: Starting Ahamatic token fetch...');
 
       final ahamaticResponse =
@@ -129,6 +140,42 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       throw PlatformException(
         code: 'unexpected_error',
         message: 'An unexpected error occurred during sign in: $e',
+        details: null,
+        stacktrace: stack.toString(),
+      );
+    }
+  }
+
+  Future<String> loginEmailAhamatic(
+    String apiKey,
+    String emailAddress,
+    String password,
+  ) async {
+    if (apiKey.isEmpty || emailAddress.isEmpty || password.isEmpty) {
+      throw ArgumentError(
+          'API Key, email address, and password must not be null or empty');
+    }
+
+    try {
+      final response = await _dio.post(
+        'https://dev.api.ahamatic.com/api/auth/email',
+        data: {
+          "apiKey": apiKey,
+          "emailAddress": emailAddress,
+          "password": password,
+        },
+      );
+      debugPrint('CidaasAuthApi: Login email response: $response');
+
+      return 'Hi';
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('CidaasAuthApi: Error fetching Ahamatic tokens: $e');
+        debugPrint('CidaasAuthApi: Stack trace: $stack');
+      }
+      throw PlatformException(
+        code: 'ahamatic_token_error',
+        message: 'Error fetching Ahamatic tokens: $e',
         details: null,
         stacktrace: stack.toString(),
       );
