@@ -94,8 +94,12 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       debugPrint('CidaasAuthApi: Starting Ahamatic token fetch...');
 
-      final ahamaticResponse =
-          await fetchAhamaticTokens(tokenResponse.accessToken!, apiUrl, apikey);
+      final ahamaticResponse = await fetchAhamaticTokens(
+        tokenResponse.accessToken!,
+        apiUrl,
+        apikey,
+        ahamaticLoginResponse, // Aquí pasas el token retornado por loginEmailAhamatic
+      );
 
       debugPrint('CidaasAuthApi: Ahamatic tokens fetched successfully!');
 
@@ -165,9 +169,18 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
           "password": password,
         },
       );
-      debugPrint('CidaasAuthApi: Login email response: $response');
+      debugPrint('CidaasAuthApi: Login email response: ${response.data}');
 
-      return 'Hi';
+      // Retornar el token de la respuesta
+      if (response.data != null && response.data['token'] != null) {
+        return response.data['token'];
+      } else {
+        throw PlatformException(
+          code: 'invalid_response',
+          message: 'No token found in Ahamatic login response',
+          details: response.data,
+        );
+      }
     } catch (e, stack) {
       if (kDebugMode) {
         debugPrint('CidaasAuthApi: Error fetching Ahamatic tokens: $e');
@@ -187,16 +200,18 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
     String accessToken,
     String apiUrl,
     String apiKey,
+    String ahamatictoken,
   ) async {
-    const String testTOken =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlLZXkiOiI1NzQwZWQwMC1mMTNiLTExZWMtYjQyZi0zYmQ2NDJlZWU3OTAiLCJhcHBsaWNhdGlvbiI6eyJJZCI6IjU2OTFlODUwLWYxM2ItMTFlYy1iNDJmLTNiZDY0MmVlZTc5MCIsIlNjaGVtYU5hbWUiOiI1NjkxZTg1MC1mMTNiLTExZWMtYjQyZi0zYmQ2NDJlZWU3OTAifSwiYWNjb3VudCI6eyJQZXJzb25JZCI6MTY0OSwiVXNlcklkIjoxNjUwfSwiZXhwaXJhdGlvbiI6IjFoIiwiaWF0IjoxNzU4MTkyNTUzLCJleHAiOjE3NTgxOTYxNTN9.IygfKw_xsHnYxpP2WokejJ6clxT3g75lmla6Mr3B1ik';
     debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
     debugPrint('CidaasAuthApi: Access Token: $accessToken');
     debugPrint('CidaasAuthApi: API URL: $apiUrl');
     debugPrint('CidaasAuthApi: API Key: $apiKey');
-    debugPrint('CidaasAuthApi: Token: $testTOken');
+    debugPrint('CidaasAuthApi: Token: $ahamatictoken');
 
-    if (accessToken.isEmpty || apiUrl.isEmpty || apiKey.isEmpty) {
+    if (accessToken.isEmpty ||
+        apiUrl.isEmpty ||
+        apiKey.isEmpty ||
+        ahamatictoken.isEmpty) {
       throw ArgumentError(
           'Access token, API URL, and API Key must not be null or empty');
     }
@@ -212,7 +227,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         },
         options: Options(
           headers: {
-            'Authorization': 'Bearer $testTOken',
+            'Authorization': 'Bearer $ahamatictoken',
           },
         ),
       );
