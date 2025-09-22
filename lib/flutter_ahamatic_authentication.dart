@@ -505,6 +505,14 @@ Page resource error:
       if (tokenResponse.accessToken != null) {
         debugPrint('_launchCidaasLogin: Login successful!');
 
+        debugPrint(
+            '_launchCidaasLogin: Access Token: ${tokenResponse.accessToken}');
+
+        debugPrint(
+            '_launchCidaasLogin: Refresh Token: ${tokenResponse.refreshToken}');
+
+        debugPrint('_launchCidaasLogin: ID Token: ${tokenResponse.idToken}');
+
         // Llama al callback de éxito que el cliente pasó
         if (widget.onAuthSuccess != null) {
           widget.onAuthSuccess!(
