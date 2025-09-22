@@ -227,8 +227,8 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       debugPrint('CidaasAuthApi: Ahamatic token response: ${response.data}');
       return AhamaticResponse(
         accessToken: response.data['access_token'],
-        refreshToken: response.data['refresh_token'],
-        idToken: response.data['id_token'],
+        refreshToken: response.data['refreshToken'],
+        idToken: response.data['token'],
       );
     } catch (e, stack) {
       if (kDebugMode) {
