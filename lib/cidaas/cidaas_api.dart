@@ -80,7 +80,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
       debugPrint('CidaasAuthApi: Login in ahamatic...');
 
-      final ahamaticLoginResponse = await loginEmailAhamatic(apikey);
+      final ahamaticLoginResponse = await loginEmailAhamatic(apikey, apiUrl!);
 
       debugPrint(
           'CidaasAuthApi: Ahamatic login response: $ahamaticLoginResponse');
@@ -91,7 +91,8 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         tokenResponse.accessToken!,
         apiUrl,
         apikey,
-        ahamaticLoginResponse, // Aquí pasas el token retornado por loginEmailAhamatic
+        ahamaticLoginResponse,
+        config.issuer,
       );
 
       debugPrint('CidaasAuthApi: Ahamatic tokens fetched successfully!');
@@ -145,6 +146,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
   Future<String> loginEmailAhamatic(
     String apiKey,
+    String apiUrl,
   ) async {
     if (apiKey.isEmpty ||
         devAccount['emailAddress']!.isEmpty ||
@@ -155,7 +157,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
 
     try {
       final response = await _dio.post(
-        'https://dev.api.ahamatic.com/api/auth/email',
+        '$apiUrl/api/auth/email',
         data: {
           "apiKey": apiKey,
           "emailAddress": devAccount['emailAddress'],
@@ -194,19 +196,22 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
     String? apiUrl,
     String apiKey,
     String ahamatictoken,
+    String issuer,
   ) async {
     debugPrint('CidaasAuthApi: Fetching Ahamatic tokens...');
     debugPrint('CidaasAuthApi: Access Token: $accessToken');
     debugPrint('CidaasAuthApi: API URL: $apiUrl');
     debugPrint('CidaasAuthApi: API Key: $apiKey');
+    debugPrint('CidaasAuthApi: Issuer: $issuer');
     debugPrint('CidaasAuthApi: Token: $ahamatictoken');
 
     if (accessToken.isEmpty ||
         apiUrl == null ||
         apiKey.isEmpty ||
-        ahamatictoken.isEmpty) {
+        ahamatictoken.isEmpty ||
+        issuer.isEmpty) {
       throw ArgumentError(
-          'Access token, API URL, and API Key must not be null or empty');
+          'Access token, API URL, API Key and Issuer must not be null or empty');
     }
 
     try {
@@ -217,6 +222,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
           'access_token': accessToken,
           'clientId': config.clientId,
           'redirectUrl': 'test',
+          'issuer': issuer,
         },
         options: Options(
           headers: {
