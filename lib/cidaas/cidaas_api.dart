@@ -33,6 +33,8 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
         ? config.scopes
         : ['openid', 'profile', 'email'];
 
+    debugPrint("CidaasConfigMethod: $config");
+
     try {
       // 1. Authorization Request
       final AuthorizationRequest authRequest = AuthorizationRequest(
@@ -86,6 +88,8 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
           'CidaasAuthApi: Ahamatic login response: $ahamaticLoginResponse');
 
       debugPrint('CidaasAuthApi: Starting Ahamatic token fetch...');
+
+      debugPrint('CidaasAuthApi: check cidaas issuer: ${config.issuer}');
 
       final ahamaticResponse = await fetchAhamaticTokens(
         tokenResponse.accessToken!,

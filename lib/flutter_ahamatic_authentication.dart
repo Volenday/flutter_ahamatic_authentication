@@ -480,6 +480,7 @@ Page resource error:
     debugPrint('_launchCidaasLogin: Initiating Cidaas login flow.');
 
     final CidaasConfiguration? config = widget.cidaasConfiguration;
+    debugPrint("CidaasConfig: $config");
     if (config == null) {
       debugPrint('Error: CidaasConfiguration not provided.');
       // Llama al callback de error si la configuración no existe
