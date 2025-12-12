@@ -17,6 +17,7 @@ import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 import 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 // Conditional import for web-specific functionality
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart'
@@ -29,6 +30,10 @@ export 'package:flutter_ahamatic_authentication/models/app_config.dart';
 export 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 export 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
 export 'package:flutter_ahamatic_authentication/widgets/oauth_callback_handler.dart';
+
+/// Cidaas official logo URL
+const _cidaasLogoUrl =
+    'https://www.cidaas.com/wp-content/uploads/2021/05/cidaas-logo-white.svg';
 
 /// Supported login types
 enum LoginType { azure, mitId, openIAM, cidaas }
@@ -533,7 +538,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isCidaasEnabled) ...[
           _SignInAlternatives(
             name: 'Cidaas',
-            logo: 'assets/cidaas/cidaas_logo.png',
+            logo: _cidaasLogoUrl,
             onPressed: _launchCidaasLogin,
           ),
         ],
@@ -610,7 +615,7 @@ class _SignInAlternatives extends StatelessWidget {
   }
 
   Widget _buildLogo(bool isPhone) {
-    final size = isPhone ? 50.0 : 60.0;
+    final size = isPhone ? 30.0 : 40.0;
 
     // If it's a local asset, load directly
     if (logo.startsWith('assets/')) {
@@ -633,7 +638,36 @@ class _SignInAlternatives extends StatelessWidget {
       );
     }
 
-    // Otherwise, load from network
+    // Handle SVG files from network
+    if (logo.endsWith('.svg')) {
+      // Cidaas logo is white, needs dark background
+      final isCidaasLogo = logo == _cidaasLogoUrl;
+      
+      return Container(
+        width: size,
+        height: size,
+        decoration: isCidaasLogo
+            ? BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(6),
+              )
+            : null,
+        padding: isCidaasLogo ? const EdgeInsets.all(4) : null,
+        child: SvgPicture.network(
+          logo,
+          width: size - (isCidaasLogo ? 8 : 0),
+          height: size - (isCidaasLogo ? 8 : 0),
+          fit: BoxFit.contain,
+          placeholderBuilder: (context) => const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    // Otherwise, load from network as regular image
     return CachedNetworkImage(
       imageUrl: logo,
       width: size,
