@@ -530,14 +530,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (_isCidaasEnabled)
+        if (_isCidaasEnabled) ...[
           _SignInAlternatives(
             name: 'Cidaas',
-            logo:
-                'https://brandfetch.com/cidaas.com?view=library&library=default&collection=logos&asset=idSp1mW6xT',
+            logo: 'assets/cidaas/cidaas_logo.png',
             onPressed: _launchCidaasLogin,
           ),
-        if (_isOpeniamEnabled)
+        ],
+        if (_isCidaasEnabled && (_isOpeniamEnabled || widget.enableGoogleLogin))
+          const SizedBox(width: 20),
+        if (_isOpeniamEnabled) ...[
           _SignInAlternatives(
             name: _openIamTitle,
             logo: _openIamLogo,
@@ -550,6 +552,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               _launchOpenIamLogin(context);
             },
           ),
+        ],
+        if (_isOpeniamEnabled && widget.enableGoogleLogin)
+          const SizedBox(width: 20),
         if (widget.enableGoogleLogin)
           _SignInAlternatives(
             name: 'Google',
