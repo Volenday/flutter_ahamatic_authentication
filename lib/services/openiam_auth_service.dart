@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_ahamatic_authentication/models/app_config.dart';
+import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 
 /// Interface for the OpenIAM authentication service
 abstract class OpenIamAuthService {
@@ -37,9 +37,9 @@ class OpenIamAuthServiceImpl implements OpenIamAuthService {
     }
 
     try {
-      final bool isAndroid = !kIsWeb && Platform.isAndroid;
-      final scheme =
-          isAndroid ? 'app://${params.hostName}' : '${params.hostName}://';
+      final scheme = PlatformService.isAndroid
+          ? 'app://${params.hostName}'
+          : '${params.hostName}://';
 
       final loginUrl = '${params.portalUrl}/client/${params.applicationCode}'
           '?redirect=$scheme/callback'

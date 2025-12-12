@@ -1,115 +1,112 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart';
+import 'package:go_router/go_router.dart';
 
-// config
-const environment = "sandbox";
+// ============================================================================
+// CONFIGURACIÓN
+// ============================================================================
 
-const ahaAPI = {
-  'development': 'https://dev.api.ahamatic.com',
-  'sandbox': 'https://test.api.ahamatic.com',
-  'production': 'https://api-eu.ahamatic.com'
-};
-
-const ahaPortal = {
-  "development": 'https://dev.auth.ahamatic.com',
-  "sandbox": 'https://test.auth.ahamatic.com',
-  "production": 'https://auth.ahamatic.com'
-};
-
-final apiURL = ahaAPI[environment] as String;
-final portalURL = ahaPortal[environment] as String;
+const environment = "production";
+const apiURL = 'https://api-eu.ahamatic.com';
 final dio = Dio();
 
-Map<String, String>? initialQueryParameters;
-void main() {
-  runApp(const MyApp());
+const devAccount = {
+  'emailAddress': 'developers@volenday.com',
+  'password': 'V0l3nd@yP@ssw0rd',
+};
+
+/// Configuración de Cidaas según plataforma
+CidaasConfiguration getCidaasConfig() {
+  final redirectUri = PlatformService.isWeb
+      ? 'http://localhost:8080/callback'
+      : 'app://abenaRestock/oauth2redirect';
+
+  return CidaasConfiguration(
+    clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
+    issuer: 'https://abena-prod.cidaas.eu',
+    redirectUri: redirectUri,
+    postLogoutRedirectUri: PlatformService.isWeb
+        ? 'http://localhost:8080/'
+        : 'app://abenaRestock/logout',
+    discoveryUrl:
+        'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
+    scopes: ['openid', 'profile', 'email', 'offline_access', 'dk-cpr'],
+  );
 }
 
-class MyApp extends StatefulWidget {
+// Estado global de autenticación
+String? _accessToken;
+String? _refreshToken;
+String? _idToken;
+
+// ============================================================================
+// ROUTER
+// ============================================================================
+
+final router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    GoRoute(path: '/', builder: (_, __) => const LoginPage()),
+    GoRoute(path: '/callback', builder: (_, __) => const CallbackPage()),
+    GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+  ],
+);
+
+// ============================================================================
+// MAIN
+// ============================================================================
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  final _formKey = GlobalKey<FormState>();
-  String? openIAmAuthToken;
-  String? openIAmCookie;
-  String? recipient;
-
-  String? token;
-  String? refreshToken;
-  User? user;
-
-  String? _accessToken;
-  String? _refreshToken;
-  String? _idToken;
-
-  // Callback function for a successful authentication
-  void _handleAuthSuccess({
-    String? accessToken,
-    String? refreshToken,
-    String? idToken,
-  }) {
-    setState(() {
-      _accessToken = accessToken;
-      _refreshToken = refreshToken;
-      _idToken = idToken;
-    });
-  }
-
-  // Callback function for an authentication error
-  void _handleAuthError(String errorMessage) {
-    // You can display an error message to the user here.
-    debugPrint('Error de autenticación: $errorMessage');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error de autenticación: $errorMessage')),
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Cidaas Test',
+      debugShowCheckedModeBanner: false,
+      routerConfig: router,
     );
   }
+}
+
+// ============================================================================
+// LOGIN PAGE
+// ============================================================================
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        resizeToAvoidBottomInset: false,
-        backgroundColor: Colors.grey[300],
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height,
-            child: Center(
-              child: FlutterAhaAuthentication(
-                formKey: _formKey,
-                moduleName: 'b2bScanner',
-                moduleWebName: 'b2bScannerWeb',
-                projectLogoAsset: 'assets/images/sample_logo.png',
-                applicationCode: 'abenadata',
-                environment: 'production',
-                europe: true,
-                onAuthSuccess: _handleAuthSuccess,
-                onAuthError: _handleAuthError,
-                cidaasConfiguration: CidaasConfiguration(
-                  clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
-                  issuer: 'https://abena-prod.cidaas.eu/',
-                  redirectUri: 'app://abenaRestock/oauth2redirect',
-                  postLogoutRedirectUri: 'app://abenaRestock/logout',
-                  discoveryUrl:
-                      'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
-                  scopes: [
-                    'openid',
-                    'profile',
-                    'email',
-                    'offline_access',
-                    'dk-cpr',
-                  ],
-                ),
-              ),
-            ),
+    return Scaffold(
+      backgroundColor: Colors.grey[300],
+      appBar: AppBar(title: const Text('Plugin example app')),
+      body: SafeArea(
+        child: Center(
+          child: FlutterAhaAuthentication(
+            moduleName: 'abenaRestock',
+            moduleWebName: 'abenaRestock',
+            projectLogoAsset: 'assets/images/sample_logo.png',
+            applicationCode: 'abenadata',
+            environment: 'development',
+            europe: true,
+            cidaasConfiguration: getCidaasConfig(),
+            onAuthSuccess: ({accessToken, refreshToken, idToken}) {
+              _accessToken = accessToken;
+              _refreshToken = refreshToken;
+              _idToken = idToken;
+              context.go('/home');
+            },
+            onAuthError: (error) {
+              debugPrint('Error: $error');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: $error')),
+              );
+            },
           ),
         ),
       ),
@@ -117,91 +114,126 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class User {
-  final int personID;
-  final int userID;
-  final String emailAddress;
-  final String username;
-  final String firstName;
-  final String? middleName;
-  final String lastName;
-  final UserType userType;
-  final UserPhoto? photo;
+// ============================================================================
+// CALLBACK PAGE (OAuth redirect en web)
+// ============================================================================
 
-  User({
-    required this.personID,
-    required this.userID,
-    required this.emailAddress,
-    required this.username,
-    required this.firstName,
-    this.middleName,
-    required this.lastName,
-    required this.userType,
-    this.photo,
-  });
-  static User fromJSON(dynamic data) {
-    return User(
-      personID: data['PersonId'],
-      userID: data['UserId'],
-      username: data['Username'],
-      emailAddress: data['EmailAddress'],
-      firstName: data['FirstName'],
-      middleName: data['MiddleName'],
-      lastName: data['LastName'],
-      userType: UserType.fromJSON(data['UserTypes']),
-      photo: UserPhoto.fromJSON(data['Photo']),
+class CallbackPage extends StatefulWidget {
+  const CallbackPage({super.key});
+
+  @override
+  State<CallbackPage> createState() => _CallbackPageState();
+}
+
+class _CallbackPageState extends State<CallbackPage> {
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _handleCallback();
+  }
+
+  Future<void> _handleCallback() async {
+    if (!PlatformService.isWeb) {
+      setState(() => _error = 'Solo funciona en web');
+      return;
+    }
+
+    try {
+      final cidaasWebAuth = CidaasWebAuth(dio, getCidaasConfig(), devAccount);
+      final authResult = cidaasWebAuth.handleCallback();
+
+      if (authResult == null) {
+        setState(() => _error = 'No se encontró código de autorización');
+        return;
+      }
+
+      final response =
+          await cidaasWebAuth.signInComplete('', apiURL, authResult);
+
+      _accessToken = response.accessToken;
+      _refreshToken = response.refreshToken;
+      _idToken = response.idToken;
+
+      if (mounted) context.go('/home');
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Error')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.go('/'),
+                child: const Text('Volver'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
 
-class UserType {
-  final int id;
-  final int level;
-  final String name;
+// ============================================================================
+// HOME PAGE (muestra tokens)
+// ============================================================================
 
-  const UserType({
-    required this.id,
-    required this.level,
-    required this.name,
-  });
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
-  static UserType fromJSON(dynamic data) {
-    return UserType(
-      id: data['Id'],
-      name: data['Name'],
-      level: data['Level'],
-    );
-  }
-}
-
-class UserPhoto {
-  final int? size;
-  final int? thumbSize;
-  final String fileName;
-  final String thumbFileName;
-  final String url;
-  final String thumbUrl;
-  final String mimeType;
-
-  const UserPhoto({
-    required this.fileName,
-    required this.url,
-    this.size,
-    required this.thumbFileName,
-    required this.thumbUrl,
-    this.thumbSize,
-    required this.mimeType,
-  });
-
-  static UserPhoto fromJSON(dynamic data) {
-    return UserPhoto(
-      fileName: data['fileName'],
-      url: data['url'],
-      size: data['size'],
-      thumbFileName: data['thumbFileName'],
-      thumbUrl: data['thumbUrl'],
-      thumbSize: data['thumbSize'],
-      mimeType: data['mimeType'],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Autenticado'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              _accessToken = null;
+              _refreshToken = null;
+              _idToken = null;
+              context.go('/');
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            const Text('Access Token:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            SelectableText(_accessToken ?? 'N/A',
+                style: const TextStyle(fontSize: 10)),
+            const SizedBox(height: 16),
+            const Text('Refresh Token:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            SelectableText(_refreshToken ?? 'N/A',
+                style: const TextStyle(fontSize: 10)),
+            const SizedBox(height: 16),
+            const Text('ID Token:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            SelectableText(_idToken ?? 'N/A',
+                style: const TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
     );
   }
 }

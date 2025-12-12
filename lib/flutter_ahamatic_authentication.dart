@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
@@ -14,14 +13,22 @@ import 'package:flutter_ahamatic_authentication/models/app_config.dart';
 import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
 import 'package:flutter_ahamatic_authentication/services/openiam_auth_service.dart';
 import 'package:flutter_ahamatic_authentication/services/auth_logging_service.dart';
+import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
+import 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+
+// Conditional import for web-specific functionality
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart'
+    if (dart.library.io) 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
 import 'package:universal_html/html.dart' as html;
 
 // Re-export entities to make them accessible from the main package
 export 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 export 'package:flutter_ahamatic_authentication/models/app_config.dart';
+export 'package:flutter_ahamatic_authentication/services/platform_service.dart';
+export 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
+export 'package:flutter_ahamatic_authentication/widgets/oauth_callback_handler.dart';
 
 /// Supported login types
 enum LoginType { azure, mitId, openIAM, cidaas }
@@ -130,15 +137,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String _openIamLogo = '';
   String _openIamTitle = '';
   String? _hostName;
-  int _loadingPercentage = 0;
   String? _openiamLoginUrl;
-
-  // WebView
-  final _webViewKey = UniqueKey();
-  late final WebViewController _webViewController;
-  final Set<Factory<OneSequenceGestureRecognizer>> _gestureRecognizers = {
-    Factory(() => EagerGestureRecognizer())
-  };
 
   // Development credentials
   final _devAccount = {
@@ -146,15 +145,43 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     'password': 'V0l3nd@yP@ssw0rd',
   };
 
-  // Current web URL
-  String get _currentWebUrl => kIsWeb ? html.window.location.href : '';
+  // Current web URL - works on both web and mobile
+  String get _currentWebUrl {
+    if (PlatformService.isWeb) {
+      try {
+        return html.window.location.href;
+      } catch (e) {
+        return '';
+      }
+    }
+    return '';
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeServices();
-    _initializeWebView();
     _loadInitialData();
+
+    // Check for OAuth callback on web
+    if (PlatformService.isWeb) {
+      _checkWebCallback();
+    }
+  }
+
+  /// Checks for OAuth callback parameters in the URL (web only)
+  void _checkWebCallback() {
+    try {
+      final uri = Uri.parse(html.window.location.href);
+      if (uri.queryParameters.containsKey('token')) {
+        final token = uri.queryParameters['token'];
+        if (token != null) {
+          _handleAuthenticationSuccess(token);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking web callback: $e');
+    }
   }
 
   /// Initializes the required services
@@ -177,59 +204,10 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       apiUrl: _envConfig.apiUrl,
     );
 
-    debugPrint('Services initialized with environment: ${widget.environment}');
-  }
-
-  /// Initializes the WebViewController for native apps
-  void _initializeWebView() {
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: _onWebViewProgress,
-          onPageStarted: _onWebViewPageStarted,
-          onPageFinished: _onWebViewPageFinished,
-          onWebResourceError: _onWebViewError,
-          onNavigationRequest: _onWebViewNavigationRequest,
-        ),
-      );
-
-    if (!kIsWeb) {
-      WebViewCookieManager().clearCookies();
-      debugPrint('WebView cookies cleared');
-    }
-  }
-
-  void _onWebViewProgress(int progress) {
-    setState(() => _loadingPercentage = progress);
-  }
-
-  void _onWebViewPageStarted(String url) {
-    setState(() => _loadingPercentage = 0);
-  }
-
-  void _onWebViewPageFinished(String url) {
-    setState(() => _loadingPercentage = 100);
-  }
-
-  void _onWebViewError(WebResourceError error) {
-    debugPrint('WebView error: ${error.errorCode} - ${error.description}');
-  }
-
-  Future<NavigationDecision> _onWebViewNavigationRequest(
-    NavigationRequest request,
-  ) async {
-    final uri = Uri.parse(request.url);
-
-    if (uri.queryParameters.containsKey('refreshToken')) {
-      final token = uri.queryParameters['token'];
-      if (token != null) {
-        await _handleAuthenticationSuccess(token);
-      }
-      return NavigationDecision.prevent;
-    }
-
-    return NavigationDecision.navigate;
+    debugPrint(
+      'Services initialized with environment: ${widget.environment}, '
+      'platform: ${PlatformService.platformName}',
+    );
   }
 
   /// Loads initial application data
@@ -306,6 +284,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   /// Launches the OpenIAM login flow
+  ///
+  /// This method handles both web and mobile platforms automatically.
   Future<void> _launchOpenIamLogin(BuildContext context) async {
     // Update hostName if not available
     if (_hostName == null && widget.moduleName != null) {
@@ -332,16 +312,19 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
     final loginUrl = _openIamService.generateLoginUrl(
       loginParams,
-      isWeb: kIsWeb,
+      isWeb: PlatformService.isWeb,
     );
 
     if (loginUrl == null) {
       debugPrint('Could not generate login URL');
+      widget.onAuthError?.call('Could not generate login URL');
       return;
     }
 
     _openiamLoginUrl = loginUrl;
+    debugPrint('OpenIAM Login URL: $loginUrl');
 
+    // Handle external browser login
     if (widget.externalBrowserLogin == true) {
       await launchUrl(
         Uri.parse(loginUrl),
@@ -350,88 +333,38 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       return;
     }
 
-    if (kIsWeb) {
-      html.window.open(loginUrl, '_self');
+    // Platform-specific authentication handling
+    if (PlatformService.isWeb) {
+      // On web, redirect to the login URL
+      html.window.location.href = loginUrl;
     } else {
-      _webViewController.loadRequest(Uri.parse(loginUrl));
-      _showWebViewDialog(context, loginUrl);
+      // On mobile, show the authentication dialog with WebView
+      await showAuthDialog(
+        context,
+        url: loginUrl,
+        onAuthSuccess: (token) async {
+          await _handleAuthenticationSuccess(token);
+          widget.onAuthSuccess?.call(
+            accessToken: token,
+            refreshToken: null,
+            idToken: null,
+          );
+        },
+        onAuthError: (error) {
+          debugPrint('Auth error: $error');
+          widget.onAuthError?.call(error);
+        },
+        onClose: () {
+          debugPrint('Auth dialog closed by user');
+        },
+      );
     }
   }
 
-  /// Shows the WebView dialog for login
-  void _showWebViewDialog(BuildContext context, String url) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Stack(
-                children: [
-                  AlertDialog(
-                    contentPadding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
-                    insetPadding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    content: Column(
-                      children: [
-                        _buildCloseButton(dialogContext),
-                        Expanded(
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width,
-                            height: MediaQuery.of(context).size.height * 0.9,
-                            child: Stack(
-                              children: [
-                                _buildWebView(),
-                                if (_loadingPercentage < 100)
-                                  const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF003D7F),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCloseButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.pop(context),
-      child: const Align(
-        alignment: Alignment.topRight,
-        child: Icon(
-          Icons.close,
-          color: Colors.red,
-          size: 30,
-          textDirection: TextDirection.rtl,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWebView() {
-    return WebViewWidget(
-      key: _webViewKey,
-      controller: _webViewController,
-      gestureRecognizers: _gestureRecognizers,
-    );
-  }
-
   /// Launches the Cidaas login flow
+  ///
+  /// On mobile, uses flutter_appauth for native OAuth2 flow.
+  /// On web, uses standard OAuth2 with redirect/popup.
   Future<void> _launchCidaasLogin() async {
     final config = widget.cidaasConfiguration;
 
@@ -442,28 +375,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
 
     try {
-      final cidaasAuthApi = CidaasAuthApiImpl(
-        _dio,
-        const FlutterAppAuth(),
-        config,
-        _devAccount,
-      );
-
-      final tokenResponse = await cidaasAuthApi.signInWithCidaas(
-        _apiKey,
-        _envConfig.apiUrl,
-      );
-
-      if (tokenResponse.accessToken != null) {
-        debugPrint('Cidaas login successful');
-        widget.onAuthSuccess?.call(
-          accessToken: tokenResponse.accessToken,
-          refreshToken: tokenResponse.refreshToken,
-          idToken: tokenResponse.idToken,
-        );
+      if (PlatformService.isWeb) {
+        // Web: Use OAuth2 redirect flow
+        await _launchCidaasLoginWeb(config);
       } else {
-        debugPrint('Cidaas login failed: no access token');
-        widget.onAuthError?.call('Login failed, no access token.');
+        // Mobile: Use flutter_appauth
+        await _launchCidaasLoginMobile(config);
       }
     } on PlatformException catch (e) {
       debugPrint('Cidaas PlatformException: ${e.message}');
@@ -472,6 +389,48 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     } catch (e) {
       debugPrint('Cidaas unexpected error: $e');
       widget.onAuthError?.call('An unexpected error occurred: $e');
+    }
+  }
+
+  /// Launches Cidaas login for web platform
+  Future<void> _launchCidaasLoginWeb(CidaasConfiguration config) async {
+    debugPrint('Launching Cidaas login for web');
+
+    final cidaasWebAuth = CidaasWebAuth(_dio, config, _devAccount);
+
+    // Initiate the OAuth2 flow - this will redirect the browser
+    cidaasWebAuth.initiateAuthFlow();
+
+    // Note: The flow continues when the user returns to the callback URL.
+    // The callback handling should be done in initState or a dedicated callback page.
+  }
+
+  /// Launches Cidaas login for mobile platforms
+  Future<void> _launchCidaasLoginMobile(CidaasConfiguration config) async {
+    debugPrint('Launching Cidaas login for mobile');
+
+    final cidaasAuthApi = CidaasAuthApiImpl(
+      _dio,
+      const FlutterAppAuth(),
+      config,
+      _devAccount,
+    );
+
+    final tokenResponse = await cidaasAuthApi.signInWithCidaas(
+      _apiKey,
+      _envConfig.apiUrl,
+    );
+
+    if (tokenResponse.accessToken != null) {
+      debugPrint('Cidaas login successful');
+      widget.onAuthSuccess?.call(
+        accessToken: tokenResponse.accessToken,
+        refreshToken: tokenResponse.refreshToken,
+        idToken: tokenResponse.idToken,
+      );
+    } else {
+      debugPrint('Cidaas login failed: no access token');
+      widget.onAuthError?.call('Login failed, no access token.');
     }
   }
 

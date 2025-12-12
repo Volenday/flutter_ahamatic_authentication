@@ -5,6 +5,8 @@ class CidaasConfiguration {
   final String postLogoutRedirectUri;
   final String discoveryUrl;
   final List<String> scopes;
+  final String? redirectWebUri;
+  final String? postLogoutWebUri;
   final Map<String, String>? customParameter;
 
   CidaasConfiguration({
@@ -14,6 +16,8 @@ class CidaasConfiguration {
     required this.postLogoutRedirectUri,
     required this.discoveryUrl,
     required this.scopes,
+    this.redirectWebUri,
+    this.postLogoutWebUri,
     this.customParameter,
   });
 }
