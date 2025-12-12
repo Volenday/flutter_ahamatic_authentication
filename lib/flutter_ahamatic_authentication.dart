@@ -612,20 +612,39 @@ class _SignInAlternatives extends StatelessWidget {
   Widget _buildLogo(bool isPhone) {
     final size = isPhone ? 50.0 : 60.0;
 
-    return CachedNetworkImage(
-      imageUrl: logo,
-      placeholder: (context, url) => const CircularProgressIndicator(),
-      errorWidget: (context, url, error) {
-        if (logo.startsWith('assets/')) {
+    // If it's a local asset, load directly
+    if (logo.startsWith('assets/')) {
+      return Image.asset(
+        logo,
+        package: 'flutter_ahamatic_authentication',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          // Try without package prefix (for app assets)
           return Image.asset(
             logo,
             width: size,
             height: size,
             fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
           );
-        }
-        return const Icon(Icons.error);
-      },
+        },
+      );
+    }
+
+    // Otherwise, load from network
+    return CachedNetworkImage(
+      imageUrl: logo,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      placeholder: (context, url) => const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      errorWidget: (context, url, error) => const Icon(Icons.error),
     );
   }
 }
