@@ -118,7 +118,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       debugPrint(
           'CidaasAuthApi: PlatformException during sign-in: ${e.code} - ${e.message}');
       debugPrint('CidaasAuthApi: Stack trace: $stack');
-      // Manejo específico para cancelación por el usuario
+      // Specific handling for user cancellation
       if (e.code == 'authorize_failed' &&
           (e.details?.toString().contains('User cancelled flow') ?? false)) {
         throw PlatformException(
@@ -170,7 +170,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
       );
       debugPrint('CidaasAuthApi: Login email response: ${response.data}');
 
-      // Retornar el token de la respuesta
+      // Return the token from the response
       if (response.data != null && response.data['token'] != null) {
         return response.data['token'];
       } else {
@@ -194,7 +194,7 @@ class CidaasAuthApiImpl implements CidaasAuthApi {
     }
   }
 
-  // Necesitamos hacer una llamada a ahamatic para validar la información y enviar los nuevos tokens al cliente
+  // We need to call ahamatic to validate the information and send the new tokens to the client
   Future<AhamaticResponse> fetchAhamaticTokens(
     String accessToken,
     String? apiUrl,
