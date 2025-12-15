@@ -534,10 +534,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Widget _buildAuthButtons(BuildContext context, bool isPhone) {
-    // On web, always use local asset for OpenIAM due to CORS issues with external URLs
-    // On mobile, try the API URL first, fallback to local asset if empty
-    final useLocalOpenIamAsset = PlatformService.isWeb || _openIamLogo.isEmpty;
-
+    // Always use local assets for both Cidaas and OpenIAM to avoid
+    // CORS issues on web and network loading issues on mobile
     return Wrap(
       alignment: WrapAlignment.center,
       spacing: 20,
@@ -553,8 +551,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isOpeniamEnabled)
           _SignInAlternatives(
             name: _openIamTitle.isNotEmpty ? _openIamTitle : 'Abena ID',
-            logo: useLocalOpenIamAsset ? _openIamLogoAsset : _openIamLogo,
-            isAsset: useLocalOpenIamAsset,
+            logo: _openIamLogoAsset,
+            isAsset: true,
             onPressed: () {
               if (widget.environment != 'production') {
                 ScaffoldMessenger.of(context).showSnackBar(
