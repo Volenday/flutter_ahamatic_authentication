@@ -259,13 +259,24 @@ class CidaasWebAuth {
     String apiUrl,
     CidaasWebAuthResult authResult,
   ) async {
+    debugPrint('CidaasWebAuth: signInComplete started');
+    debugPrint(
+        '  - apiKey: ${apiKey.isEmpty ? "(empty)" : apiKey.substring(0, 10)}...');
+    debugPrint('  - apiUrl: $apiUrl');
+
     // 1. Exchange code for Cidaas tokens
     final tokenResponse = await exchangeCodeForTokens(authResult);
+    debugPrint('CidaasWebAuth: Got Cidaas tokens');
+    debugPrint(
+        '  - accessToken: ${tokenResponse.accessToken?.substring(0, 20)}...');
 
     // 2. Login to Ahamatic
+    debugPrint('CidaasWebAuth: Logging into Ahamatic...');
     final ahamaticLoginToken = await _loginEmailAhamatic(apiKey, apiUrl);
+    debugPrint('CidaasWebAuth: Got Ahamatic login token');
 
     // 3. Exchange Cidaas token for Ahamatic tokens
+    debugPrint('CidaasWebAuth: Exchanging for Ahamatic tokens...');
     return await _fetchAhamaticTokens(
       tokenResponse.accessToken!,
       apiUrl,
@@ -275,19 +286,32 @@ class CidaasWebAuth {
   }
 
   Future<String> _loginEmailAhamatic(String apiKey, String apiUrl) async {
-    final response = await _dio.post(
-      '$apiUrl/api/auth/email',
-      data: {
-        'apiKey': apiKey,
-        'emailAddress': devAccount['emailAddress'],
-        'password': devAccount['password'],
-      },
-    );
+    debugPrint('CidaasWebAuth: _loginEmailAhamatic');
+    debugPrint('  - URL: $apiUrl/api/auth/email');
+    debugPrint('  - apiKey: ${apiKey.isEmpty ? "(empty)" : "provided"}');
+    debugPrint('  - email: ${devAccount['emailAddress']}');
 
-    if (response.data != null && response.data['token'] != null) {
-      return response.data['token'];
+    try {
+      final response = await _dio.post(
+        '$apiUrl/api/auth/email',
+        data: {
+          'apiKey': apiKey,
+          'emailAddress': devAccount['emailAddress'],
+          'password': devAccount['password'],
+        },
+      );
+
+      debugPrint(
+          'CidaasWebAuth: _loginEmailAhamatic response: ${response.statusCode}');
+
+      if (response.data != null && response.data['token'] != null) {
+        return response.data['token'];
+      }
+      throw Exception('No token found in Ahamatic login response');
+    } catch (e) {
+      debugPrint('CidaasWebAuth: _loginEmailAhamatic error: $e');
+      rethrow;
     }
-    throw Exception('No token found in Ahamatic login response');
   }
 
   Future<AhamaticResponse> _fetchAhamaticTokens(
@@ -296,25 +320,36 @@ class CidaasWebAuth {
     String apiKey,
     String ahamaticToken,
   ) async {
-    final response = await _dio.post(
-      '$apiUrl/api/auth/cidaas',
-      data: {
-        'apiKey': apiKey,
-        'access_token': accessToken,
-        'clientId': config.clientId,
-        'redirectUrl': config.redirectWebUri,
-        'issuer': config.issuer,
-      },
-      options: Options(
-        headers: {'Authorization': 'Bearer $ahamaticToken'},
-      ),
-    );
+    debugPrint('CidaasWebAuth: _fetchAhamaticTokens');
+    debugPrint('  - URL: $apiUrl/api/auth/cidaas');
 
-    return AhamaticResponse(
-      accessToken: response.data['access_token'],
-      refreshToken: response.data['refreshToken'],
-      idToken: response.data['token'],
-    );
+    try {
+      final response = await _dio.post(
+        '$apiUrl/api/auth/cidaas',
+        data: {
+          'apiKey': apiKey,
+          'access_token': accessToken,
+          'clientId': config.clientId,
+          'redirectUrl': config.redirectWebUri,
+          'issuer': config.issuer,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $ahamaticToken'},
+        ),
+      );
+
+      debugPrint(
+          'CidaasWebAuth: _fetchAhamaticTokens response: ${response.statusCode}');
+
+      return AhamaticResponse(
+        accessToken: response.data['access_token'],
+        refreshToken: response.data['refreshToken'],
+        idToken: response.data['token'],
+      );
+    } catch (e) {
+      debugPrint('CidaasWebAuth: _fetchAhamaticTokens error: $e');
+      rethrow;
+    }
   }
 }
 

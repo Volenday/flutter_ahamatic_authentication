@@ -2,14 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart';
+import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 
 // ============================================================================
 // CONFIGURACIÓN
 // ============================================================================
 
-const environment = "production";
-const apiURL = 'https://api-eu.ahamatic.com';
+const environment = "sandbox";
+String get apiURL {
+  switch (environment) {
+    case 'production':
+      return 'https://api-eu.ahamatic.com';
+    case 'sandbox':
+      return 'https://test.api.ahamatic.com';
+    case 'development':
+    default:
+      return 'https://dev.api.ahamatic.com';
+  }
+}
+
 final dio = Dio();
 
 const devAccount = {
@@ -74,9 +87,23 @@ String? _idToken;
 
 final router = GoRouter(
   initialLocation: '/',
+  debugLogDiagnostics: true,
+  redirect: (context, state) {
+    debugPrint('🚦 ROUTER - Path: ${state.uri.path}');
+    debugPrint('🚦 ROUTER - Full URI: ${state.uri}');
+    debugPrint('🚦 ROUTER - Query params: ${state.uri.queryParameters}');
+    return null; // No redirect
+  },
   routes: [
     GoRoute(path: '/', builder: (_, __) => const LoginPage()),
-    GoRoute(path: '/callback', builder: (_, __) => const CallbackPage()),
+    GoRoute(
+      path: '/callback',
+      builder: (context, state) {
+        debugPrint('📍 CALLBACK ROUTE - Building CallbackPage');
+        debugPrint('📍 Query params: ${state.uri.queryParameters}');
+        return const CallbackPage();
+      },
+    ),
     GoRoute(path: '/home', builder: (_, __) => const HomePage()),
   ],
 );
@@ -85,7 +112,11 @@ final router = GoRouter(
 // MAIN
 // ============================================================================
 
-void main() => runApp(const MyApp());
+void main() {
+  // Use path URL strategy (URLs sin hash #) para que OAuth callbacks funcionen
+  usePathUrlStrategy();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -162,29 +193,70 @@ class _CallbackPageState extends State<CallbackPage> {
   }
 
   Future<void> _handleCallback() async {
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🔄 CALLBACK - Iniciando procesamiento...');
+    debugPrint('═══════════════════════════════════════════════════════');
+
     if (!PlatformService.isWeb) {
       setState(() => _error = 'Solo funciona en web');
       return;
     }
 
     try {
-      final cidaasWebAuth = CidaasWebAuth(dio, getCidaasConfig(), devAccount);
-      final authResult = cidaasWebAuth.handleCallback();
+      // 1. Obtener el apiKey del módulo (igual que en mobile)
+      debugPrint('🔑 Obteniendo configuración del módulo...');
+      final ahamaticApiService =
+          AhamaticApiServiceImpl(dio: dio, apiUrl: apiURL);
+      final moduleConfig = await ahamaticApiService.getModuleConfig(
+        'abenadata', // applicationCode
+        'abenaRestock', // moduleName
+      );
+      final apiKey = moduleConfig.apiKey ?? '';
+      debugPrint(
+          '🔑 ApiKey obtenido: ${apiKey.isEmpty ? "(empty)" : "${apiKey.substring(0, 10)}..."}');
 
-      if (authResult == null) {
-        setState(() => _error = 'No se encontró código de autorización');
+      if (apiKey.isEmpty) {
+        setState(() => _error = 'No se pudo obtener el apiKey del módulo');
         return;
       }
 
+      // 2. Obtener configuración de Cidaas
+      final config = getCidaasConfig();
+      debugPrint('🔑 Cidaas Config cargada: ${config.clientId}');
+
+      final cidaasWebAuth = CidaasWebAuth(dio, config, devAccount);
+      debugPrint('🔑 CidaasWebAuth creado');
+
+      final authResult = cidaasWebAuth.handleCallback();
+      debugPrint('🔑 handleCallback ejecutado');
+
+      if (authResult == null) {
+        debugPrint('❌ authResult es null');
+        setState(() => _error =
+            'No se encontró código de autorización o el state no coincide');
+        return;
+      }
+
+      debugPrint(
+          '✅ Código obtenido: ${authResult.authorizationCode.substring(0, 10)}...');
+      debugPrint('🔄 Intercambiando código por tokens...');
+
+      // 3. Usar el apiKey obtenido del módulo
       final response =
-          await cidaasWebAuth.signInComplete('', apiURL, authResult);
+          await cidaasWebAuth.signInComplete(apiKey, apiURL, authResult);
+
+      debugPrint('✅ Tokens recibidos!');
+      debugPrint(
+          '  - Access Token: ${response.accessToken?.substring(0, 20)}...');
 
       _accessToken = response.accessToken;
       _refreshToken = response.refreshToken;
       _idToken = response.idToken;
 
       if (mounted) context.go('/home');
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ Error en callback: $e');
+      debugPrint('Stack: $stack');
       setState(() => _error = e.toString());
     }
   }
