@@ -50,8 +50,11 @@ class CidaasWebAuth {
   /// The [returnUrl] is where Cidaas will redirect after authentication.
   void initiateAuthFlow({String? returnUrl}) {
     final codeVerifier = generateCodeVerifier();
+    debugPrint('CidaasWebAuth: Code verifier: $codeVerifier');
     final codeChallenge = generateCodeChallenge(codeVerifier);
+    debugPrint('CidaasWebAuth: Code challenge: $codeChallenge');
     final state = generateState();
+    debugPrint('CidaasWebAuth: State: $state');
 
     // Store PKCE values in session storage for later use
     html.window.sessionStorage['cidaas_code_verifier'] = codeVerifier;
@@ -61,7 +64,11 @@ class CidaasWebAuth {
         ? config.scopes.join(' ')
         : 'openid profile email';
 
+    debugPrint('CidaasWebAuth: Scopes: $scopes');
+
     final redirectUri = returnUrl ?? config.redirectWebUri;
+
+    debugPrint('CidaasWebAuth: Redirect URI: $redirectUri');
 
     final authUrl = Uri.parse('${config.issuer}/authz-srv/authz').replace(
       queryParameters: {
@@ -157,7 +164,7 @@ class CidaasWebAuth {
 
     // Check if popup was closed without completing auth
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      final isClosed = popup.closed == true;
+      final isClosed = popup?.closed == true;
       if (isClosed) {
         timer.cancel();
         html.window.removeEventListener('message', messageListener);

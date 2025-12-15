@@ -18,22 +18,49 @@ const devAccount = {
 };
 
 /// Configuración de Cidaas según plataforma
-CidaasConfiguration getCidaasConfig() {
-  final redirectUri = PlatformService.isWeb
-      ? 'http://localhost:8080/callback'
-      : 'app://abenaRestock/oauth2redirect';
+final cidaasMobileConfig = CidaasConfiguration(
+  clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
+  issuer: 'https://abena-prod.cidaas.eu',
+  redirectUri: 'app://abenaRestock/oauth2redirect',
+  postLogoutRedirectUri: 'app://abenaRestock/logout',
+  discoveryUrl: 'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
+  scopes: ['openid', 'profile', 'email', 'offline_access', 'dk-cpr'],
+);
 
-  return CidaasConfiguration(
-    clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
-    issuer: 'https://abena-prod.cidaas.eu',
-    redirectUri: redirectUri,
-    postLogoutRedirectUri: PlatformService.isWeb
-        ? 'http://localhost:8080/'
-        : 'app://abenaRestock/logout',
-    discoveryUrl:
-        'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
-    scopes: ['openid', 'profile', 'email', 'offline_access', 'dk-cpr'],
-  );
+final cidaasWebConfig = CidaasConfiguration(
+  clientId: '88658db5-3737-45ac-b350-c6e8527ed190',
+  issuer: 'https://test-login.abena.com',
+  redirectUri: 'app://abenaRestock/oauth2redirect',
+  postLogoutRedirectUri: 'app://abenaRestock/logout',
+  discoveryUrl: 'https://test-login.abena.com/.well-known/openid-configuration',
+  scopes: ['openid', 'profile', 'email', 'offline_access'],
+  redirectWebUri: 'http://localhost:8080/callback',
+  postLogoutWebUri: 'http://localhost:8080/',
+);
+
+/// Obtiene la configuración de Cidaas según la plataforma
+CidaasConfiguration getCidaasConfig() {
+  final isWeb = PlatformService.isWeb;
+  final config = isWeb ? cidaasWebConfig : cidaasMobileConfig;
+
+  debugPrint('═══════════════════════════════════════════════════════');
+  debugPrint('📱 CIDAAS CONFIG - Plataforma: ${isWeb ? "WEB" : "MOBILE"}');
+  debugPrint('═══════════════════════════════════════════════════════');
+  debugPrint('  clientId: ${config.clientId}');
+  debugPrint('  issuer: ${config.issuer}');
+  debugPrint('  redirectUri: ${config.redirectUri}');
+  debugPrint('  postLogoutRedirectUri: ${config.postLogoutRedirectUri}');
+  debugPrint('  discoveryUrl: ${config.discoveryUrl}');
+  debugPrint('  scopes: ${config.scopes}');
+  if (config.redirectWebUri != null) {
+    debugPrint('  redirectWebUri: ${config.redirectWebUri}');
+  }
+  if (config.postLogoutWebUri != null) {
+    debugPrint('  postLogoutWebUri: ${config.postLogoutWebUri}');
+  }
+  debugPrint('═══════════════════════════════════════════════════════');
+
+  return config;
 }
 
 // Estado global de autenticación

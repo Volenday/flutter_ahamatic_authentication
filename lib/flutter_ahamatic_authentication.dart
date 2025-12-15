@@ -21,7 +21,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 // Conditional import for web-specific functionality
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart'
-    if (dart.library.io) 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
+    if (dart.library.io) 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth_stub.dart';
 import 'package:universal_html/html.dart' as html;
 
 // Re-export entities to make them accessible from the main package
@@ -31,9 +31,11 @@ export 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 export 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
 export 'package:flutter_ahamatic_authentication/widgets/oauth_callback_handler.dart';
 
-/// Cidaas official logo URL
-const _cidaasLogoUrl =
-    'https://www.cidaas.com/wp-content/uploads/2021/05/cidaas-logo-white.svg';
+/// Cidaas logo asset path (local asset to avoid CORS issues)
+const _cidaasLogoAsset = 'assets/cidaas/cidaas_logo.png';
+
+/// OpenIAM/Abena ID logo asset path (local fallback)
+const _openIamLogoAsset = 'assets/openiam/abena_logo.png';
 
 /// Supported login types
 enum LoginType { azure, mitId, openIAM, cidaas }
@@ -532,22 +534,27 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   }
 
   Widget _buildAuthButtons(BuildContext context, bool isPhone) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // On web, always use local asset for OpenIAM due to CORS issues with external URLs
+    // On mobile, try the API URL first, fallback to local asset if empty
+    final useLocalOpenIamAsset = PlatformService.isWeb || _openIamLogo.isEmpty;
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 20,
+      runSpacing: 10,
       children: [
-        if (_isCidaasEnabled) ...[
+        if (_isCidaasEnabled)
           _SignInAlternatives(
             name: 'Cidaas',
-            logo: _cidaasLogoUrl,
+            logo: _cidaasLogoAsset,
+            isAsset: true,
             onPressed: _launchCidaasLogin,
           ),
-        ],
-        if (_isCidaasEnabled && (_isOpeniamEnabled || widget.enableGoogleLogin))
-          const SizedBox(width: 20),
-        if (_isOpeniamEnabled) ...[
+        if (_isOpeniamEnabled)
           _SignInAlternatives(
-            name: _openIamTitle,
-            logo: _openIamLogo,
+            name: _openIamTitle.isNotEmpty ? _openIamTitle : 'Abena ID',
+            logo: useLocalOpenIamAsset ? _openIamLogoAsset : _openIamLogo,
+            isAsset: useLocalOpenIamAsset,
             onPressed: () {
               if (widget.environment != 'production') {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -557,13 +564,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
               _launchOpenIamLogin(context);
             },
           ),
-        ],
-        if (_isOpeniamEnabled && widget.enableGoogleLogin)
-          const SizedBox(width: 20),
         if (widget.enableGoogleLogin)
           _SignInAlternatives(
             name: 'Google',
             logo: 'google',
+            isAsset: false,
             onPressed: () => widget.onPressedGoogleLogin?.call(),
           ),
       ],
@@ -575,12 +580,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 class _SignInAlternatives extends StatelessWidget {
   final String logo;
   final String name;
+  final bool isAsset;
   final VoidCallback onPressed;
 
   const _SignInAlternatives({
     required this.logo,
     required this.name,
     required this.onPressed,
+    this.isAsset = false,
   });
 
   @override
@@ -589,6 +596,7 @@ class _SignInAlternatives extends StatelessWidget {
     final size = isPhone ? 50.0 : 60.0;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         ElevatedButton(
           onPressed: onPressed,
@@ -604,21 +612,38 @@ class _SignInAlternatives extends StatelessWidget {
           child: Container(
             width: size,
             height: size,
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: _buildLogo(isPhone),
           ),
         ),
-        const SizedBox(height: 10),
-        Text(name, style: TextStyle(fontSize: isPhone ? 12 : 14)),
+        const SizedBox(height: 8),
+        Text(
+          name,
+          style: TextStyle(fontSize: isPhone ? 12 : 14),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
 
   Widget _buildLogo(bool isPhone) {
-    final size = isPhone ? 30.0 : 40.0;
+    final size = isPhone ? 34.0 : 44.0;
 
-    // If it's a local asset, load directly
-    if (logo.startsWith('assets/')) {
+    // Load from local asset
+    if (isAsset && logo.isNotEmpty) {
+      // Handle SVG assets
+      if (logo.endsWith('.svg')) {
+        return SvgPicture.asset(
+          logo,
+          package: 'flutter_ahamatic_authentication',
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          placeholderBuilder: (context) => _buildLoadingIndicator(size),
+        );
+      }
+
+      // Handle PNG/JPG assets
       return Image.asset(
         logo,
         package: 'flutter_ahamatic_authentication',
@@ -626,59 +651,96 @@ class _SignInAlternatives extends StatelessWidget {
         height: size,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) {
-          // Try without package prefix (for app assets)
-          return Image.asset(
-            logo,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported),
-          );
+          debugPrint('Error loading asset $logo: $error');
+          return _buildFallbackIcon(size);
         },
       );
     }
 
-    // Handle SVG files from network
-    if (logo.endsWith('.svg')) {
-      // Cidaas logo is white, needs dark background
-      final isCidaasLogo = logo == _cidaasLogoUrl;
-      
-      return Container(
+    // Load from network URL
+    if (logo.isNotEmpty && !isAsset) {
+      // Handle SVG files from network
+      if (logo.endsWith('.svg')) {
+        return SvgPicture.network(
+          logo,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          placeholderBuilder: (context) => _buildLoadingIndicator(size),
+        );
+      }
+
+      // Handle regular images from network
+      return CachedNetworkImage(
+        imageUrl: logo,
         width: size,
         height: size,
-        decoration: isCidaasLogo
-            ? BoxDecoration(
-                color: const Color(0xFF1A1A2E),
-                borderRadius: BorderRadius.circular(6),
-              )
-            : null,
-        padding: isCidaasLogo ? const EdgeInsets.all(4) : null,
-        child: SvgPicture.network(
-          logo,
-          width: size - (isCidaasLogo ? 8 : 0),
-          height: size - (isCidaasLogo ? 8 : 0),
-          fit: BoxFit.contain,
-          placeholderBuilder: (context) => const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
+        fit: BoxFit.contain,
+        placeholder: (context, url) => _buildLoadingIndicator(size),
+        errorWidget: (context, url, error) {
+          debugPrint('Error loading network image $logo: $error');
+          return _buildFallbackIcon(size);
+        },
       );
     }
 
-    // Otherwise, load from network as regular image
-    return CachedNetworkImage(
-      imageUrl: logo,
+    // Fallback icon when logo is empty
+    return _buildFallbackIcon(size);
+  }
+
+  /// Builds a loading indicator
+  Widget _buildLoadingIndicator(double size) {
+    return SizedBox(
       width: size,
       height: size,
-      fit: BoxFit.contain,
-      placeholder: (context, url) => const SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(strokeWidth: 2),
+      child: const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       ),
-      errorWidget: (context, url, error) => const Icon(Icons.error),
+    );
+  }
+
+  /// Builds a fallback icon based on the name
+  Widget _buildFallbackIcon(double size) {
+    // Determine icon color based on name
+    Color bgColor;
+    String letter;
+
+    if (name.toLowerCase().contains('cidaas')) {
+      bgColor = const Color(0xFF1A1A2E);
+      letter = 'C';
+    } else if (name.toLowerCase().contains('abena') ||
+        name.toLowerCase().contains('openiam')) {
+      bgColor = const Color(0xFF6366F1);
+      letter = 'A';
+    } else if (name.toLowerCase().contains('google')) {
+      bgColor = const Color(0xFF4285F4);
+      letter = 'G';
+    } else {
+      bgColor = Colors.grey;
+      letter = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Center(
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size * 0.45,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }
