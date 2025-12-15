@@ -3,7 +3,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.3+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.1+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey)](https://flutter.dev)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-lightgrey)](https://flutter.dev)
 
 A Flutter plugin that provides a seamless authentication interface for Ahamatic-powered applications. Supports multiple authentication providers including **OpenIAM** and **Cidaas**.
 
@@ -12,10 +12,12 @@ A Flutter plugin that provides a seamless authentication interface for Ahamatic-
 ## ✨ Features
 
 - 🔐 **OpenIAM Authentication** - Native deep link integration
-- 🌐 **Cidaas OAuth2** - Full PKCE flow support
+- 🌐 **Cidaas OAuth2** - Full PKCE flow support for mobile and web
 - 🎨 **Customizable UI** - Project logo and name
 - 📱 **Mobile Ready** - Android & iOS support
+- 🌍 **Web Support** - OAuth2 redirect flow with PKCE
 - 🔄 **Token Management** - Access, Refresh, and ID tokens
+- 🚪 **Logout Support** - Session invalidation on Cidaas
 - ⚡ **Easy Integration** - Simple widget-based API
 
 ---
@@ -93,9 +95,9 @@ For OpenIAM, configure deep links in your native projects:
 
 ---
 
-### Cidaas Authentication
+### Cidaas Authentication (Mobile)
 
-For Cidaas OAuth2, provide the `CidaasConfiguration`:
+For Cidaas OAuth2 on mobile, provide the `CidaasConfiguration`:
 
 ```dart
 FlutterAhaAuthentication(
@@ -109,21 +111,12 @@ FlutterAhaAuthentication(
     redirectUri: 'app://yourApp/oauth2redirect',
     postLogoutRedirectUri: 'app://yourApp/logout',
     discoveryUrl: 'https://your-tenant.cidaas.eu/.well-known/openid-configuration',
-    scopes: [
-      'openid',
-      'profile',
-      'email',
-      'offline_access',
-    ],
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
   ),
   onAuthSuccess: ({accessToken, refreshToken, idToken}) {
-    // Handle successful authentication
     print('Access Token: $accessToken');
-    print('Refresh Token: $refreshToken');
-    print('ID Token: $idToken');
   },
   onAuthError: (error) {
-    // Handle authentication error
     print('Authentication failed: $error');
   },
 )
@@ -142,6 +135,137 @@ android {
     }
 }
 ```
+
+---
+
+## 🌐 Web Configuration
+
+### Setup
+
+1. **Use path URL strategy** (required for OAuth callbacks):
+
+```dart
+import 'package:flutter_web_plugins/url_strategy.dart';
+
+void main() {
+  usePathUrlStrategy(); // Important for OAuth callbacks
+  runApp(const MyApp());
+}
+```
+
+2. **Configure CidaasConfiguration with web URIs**:
+
+```dart
+final cidaasWebConfig = CidaasConfiguration(
+  clientId: 'your-web-client-id',
+  issuer: 'https://your-tenant.cidaas.eu',
+  redirectUri: 'app://yourApp/oauth2redirect', // For mobile fallback
+  postLogoutRedirectUri: 'app://yourApp/logout',
+  discoveryUrl: 'https://your-tenant.cidaas.eu/.well-known/openid-configuration',
+  scopes: ['openid', 'profile', 'email', 'offline_access'],
+  // Web-specific URIs
+  redirectWebUri: 'http://localhost:8080/callback',
+  postLogoutWebUri: 'http://localhost:8080/',
+);
+```
+
+### Manual Web Authentication Flow
+
+For web, you need to handle the OAuth callback manually:
+
+```dart
+import 'package:go_router/go_router.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart';
+import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
+
+// Router setup
+final router = GoRouter(
+  routes: [
+    GoRoute(path: '/', builder: (_, __) => const LoginPage()),
+    GoRoute(path: '/callback', builder: (_, __) => const CallbackPage()),
+    GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+  ],
+);
+
+// Callback page to handle OAuth redirect
+class CallbackPage extends StatefulWidget {
+  const CallbackPage({super.key});
+
+  @override
+  State<CallbackPage> createState() => _CallbackPageState();
+}
+
+class _CallbackPageState extends State<CallbackPage> {
+  @override
+  void initState() {
+    super.initState();
+    _handleCallback();
+  }
+
+  Future<void> _handleCallback() async {
+    try {
+      // 1. Get apiKey from module config
+      final ahamaticApiService = AhamaticApiServiceImpl(dio: dio, apiUrl: apiURL);
+      final moduleConfig = await ahamaticApiService.getModuleConfig(
+        'your-app-code',
+        'your-module',
+      );
+      final apiKey = moduleConfig.apiKey ?? '';
+
+      // 2. Handle OAuth callback
+      final cidaasWebAuth = CidaasWebAuth(dio, cidaasConfig, devAccount);
+      final authResult = cidaasWebAuth.handleCallback();
+
+      if (authResult == null) {
+        // Handle error - no auth code or state mismatch
+        return;
+      }
+
+      // 3. Exchange code for tokens
+      final response = await cidaasWebAuth.signInComplete(
+        apiKey,
+        apiURL,
+        authResult,
+      );
+
+      // 4. Use tokens
+      final accessToken = response.accessToken;
+      final refreshToken = response.refreshToken;
+      final idToken = response.idToken;
+
+      context.go('/home');
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+```
+
+### Web Logout
+
+```dart
+void logout(String? idToken) {
+  final cidaasWebAuth = CidaasWebAuth(dio, cidaasConfig, devAccount);
+  cidaasWebAuth.signOut(idToken: idToken);
+  // This redirects to Cidaas logout endpoint, then back to postLogoutWebUri
+}
+```
+
+### Cidaas Admin Configuration
+
+Ensure these URIs are registered in your Cidaas client:
+
+| Setting | Value |
+|---------|-------|
+| Redirect URIs | `http://localhost:8080/callback` (dev), `https://yourapp.com/callback` (prod) |
+| Post Logout Redirect URIs | `http://localhost:8080/` (dev), `https://yourapp.com/` (prod) |
 
 ---
 
@@ -170,98 +294,41 @@ android {
 | `issuer` | `String` | ✅ | Cidaas issuer URL |
 | `discoveryUrl` | `String` | ✅ | OpenID Connect discovery URL |
 | `scopes` | `List<String>` | ✅ | OAuth2 scopes |
-| `redirectUri` | `String?` | 📱 | Redirect URI for mobile |
-| `postLogoutRedirectUri` | `String?` | 📱 | Post logout URI for mobile |
+| `redirectUri` | `String` | ✅ | Redirect URI for mobile |
+| `postLogoutRedirectUri` | `String` | ✅ | Post logout URI for mobile |
 | `redirectWebUri` | `String?` | 🌐 | Redirect URI for web |
 | `postLogoutWebUri` | `String?` | 🌐 | Post logout URI for web |
+| `customParameter` | `Map<String, String>?` | ❌ | Additional OAuth2 parameters |
 
 ---
 
-## 📋 Complete Example
+## 🔄 Authentication Flow
 
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
+### Mobile Flow (flutter_appauth)
 
-void main() => runApp(const MyApp());
-
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  String? _accessToken;
-  String? _refreshToken;
-  String? _idToken;
-
-  void _handleAuthSuccess({
-    String? accessToken,
-    String? refreshToken,
-    String? idToken,
-  }) {
-    setState(() {
-      _accessToken = accessToken;
-      _refreshToken = refreshToken;
-      _idToken = idToken;
-    });
-    debugPrint('✅ Authentication successful!');
-  }
-
-  void _handleAuthError(String errorMessage) {
-    debugPrint('❌ Authentication error: $errorMessage');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $errorMessage')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.grey[300],
-        appBar: AppBar(title: const Text('Auth Example')),
-        body: Center(
-          child: FlutterAhaAuthentication(
-            applicationCode: 'your-app-code',
-            environment: 'production',
-            europe: true,
-            moduleName: 'your-module',
-            projectName: 'My App',
-            projectLogoAsset: 'assets/images/logo.png',
-            cidaasConfiguration: CidaasConfiguration(
-              clientId: 'your-client-id',
-              issuer: 'https://your-tenant.cidaas.eu',
-              redirectUri: 'app://yourApp/oauth2redirect',
-              postLogoutRedirectUri: 'app://yourApp/logout',
-              discoveryUrl: 'https://your-tenant.cidaas.eu/.well-known/openid-configuration',
-              scopes: ['openid', 'profile', 'email', 'offline_access'],
-            ),
-            onAuthSuccess: _handleAuthSuccess,
-            onAuthError: _handleAuthError,
-          ),
-        ),
-      ),
-    );
-  }
-}
+```
+1. User taps login button
+2. flutter_appauth opens system browser
+3. User authenticates on Cidaas
+4. Cidaas redirects to app://yourApp/oauth2redirect
+5. App receives authorization code
+6. App exchanges code for Cidaas tokens
+7. App exchanges Cidaas tokens for Ahamatic tokens
+8. onAuthSuccess callback with tokens
 ```
 
----
+### Web Flow (OAuth2 with PKCE)
 
-## 🌐 Web Support
-
-> ⚠️ **Work in Progress**
->
-> Web support is currently under development. The following features are being implemented:
->
-> - OAuth2 Authorization Code flow with PKCE
-> - Popup and redirect authentication modes
-> - Session storage for PKCE state management
->
-> **Coming soon!**
+```
+1. User clicks login button
+2. App generates code_verifier and code_challenge
+3. App redirects to Cidaas authorization endpoint
+4. User authenticates on Cidaas
+5. Cidaas redirects to /callback with code
+6. CallbackPage exchanges code for Cidaas tokens
+7. App exchanges Cidaas tokens for Ahamatic tokens
+8. Navigate to authenticated page
+```
 
 ---
 
@@ -282,6 +349,23 @@ manifestPlaceholders += ['appAuthRedirectScheme': 'app']
 ### Deep links not working on iOS
 
 Verify your URL scheme is correctly added to `Info.plist` and matches your `redirectUri`.
+
+### Web: "State mismatch" error
+
+This occurs when:
+- Session storage was cleared between redirect and callback
+- User opened multiple login tabs
+- The callback URL was bookmarked
+
+Solution: Ensure users complete the flow in a single tab.
+
+### Web: Error 412 on Ahamatic API
+
+This indicates the `apiKey` is missing or invalid. Ensure you're fetching it from `getModuleConfig()` before calling `signInComplete()`.
+
+### Web: Logout doesn't invalidate session
+
+Ensure `http://localhost:8080/` (or your production URL) is registered as a Post Logout Redirect URI in Cidaas.
 
 ---
 
