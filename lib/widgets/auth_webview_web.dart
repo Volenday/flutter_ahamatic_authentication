@@ -131,7 +131,7 @@ Future<void> showWebAuthDialog(
 
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
       try {
-        final isClosed = popup.closed == true;
+        final isClosed = popup?.closed == true;
         if (isClosed) {
           timer.cancel();
           if (!completer.isCompleted) {
@@ -176,4 +176,3 @@ Future<void> showWebAuthDialog(
     html.window.location.href = url;
   }
 }
-

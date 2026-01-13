@@ -95,11 +95,32 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
     String moduleName,
   ) {
     try {
-      final configurations = jsonData['Configurations'] as List<dynamic>?;
-      if (configurations == null) {
-        return ModuleAuthConfig.empty();
+      // 1. Extract apiKey from root level APIKey.Key (global for the application)
+      String? apiKey;
+      if (jsonData['APIKey'] != null && jsonData['APIKey']['Key'] != null) {
+        apiKey = jsonData['APIKey']['Key'];
+        debugPrint('AhamaticApiService: Found apiKey at APIKey.Key');
       }
 
+      final configurations = jsonData['Configurations'] as List<dynamic>?;
+      if (configurations == null) {
+        debugPrint('AhamaticApiService: No Configurations found');
+        return ModuleAuthConfig(apiKey: apiKey);
+      }
+
+      // 2. Get Portal Authentication from root level (fallback)
+      Map<String, dynamic>? rootPortalAuth;
+      Map<String, dynamic>? rootOpenIamConfig;
+      for (var config in configurations) {
+        if (config['Key'] == 'Portal Authentication') {
+          rootPortalAuth = config['Value'];
+        }
+        if (config['Key'] == 'OpenIAM') {
+          rootOpenIamConfig = config['Value'];
+        }
+      }
+
+      // 3. Find AuthConfig
       Map<String, dynamic>? authConfig;
       for (var config in configurations) {
         if (config['Key'] == 'AuthConfig') {
@@ -109,12 +130,21 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
       }
 
       if (authConfig == null || authConfig['Value'] is! List<dynamic>) {
-        return ModuleAuthConfig.empty();
+        debugPrint(
+            'AhamaticApiService: No AuthConfig found, using root config');
+        return ModuleAuthConfig(
+          apiKey: apiKey,
+          isCidaasEnabled: rootPortalAuth?['Cidaas'] == true,
+          isOpeniamEnabled: rootPortalAuth?['OpenIAmAuth'] == true,
+          openIamLogo: rootOpenIamConfig?['logo'],
+          openIamTitle: rootOpenIamConfig?['title'],
+        );
       }
 
       final authConfigList = authConfig['Value'] as List<dynamic>;
-      Map<String, dynamic>? moduleConfig;
 
+      // 4. Find specific module config
+      Map<String, dynamic>? moduleConfig;
       for (var config in authConfigList) {
         if (config['Module'] == moduleName) {
           moduleConfig = config;
@@ -122,16 +152,27 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
         }
       }
 
+      // 5. If module not found, use root level config with global apiKey
       if (moduleConfig == null) {
-        debugPrint('AhamaticApiService: Module $moduleName not found');
-        return ModuleAuthConfig.empty();
+        debugPrint(
+            'AhamaticApiService: Module $moduleName not found, using root config');
+        return ModuleAuthConfig(
+          apiKey: apiKey,
+          isCidaasEnabled: rootPortalAuth?['Cidaas'] == true,
+          isOpeniamEnabled: rootPortalAuth?['OpenIAmAuth'] == true,
+          openIamLogo: rootOpenIamConfig?['logo'],
+          openIamTitle: rootOpenIamConfig?['title'],
+        );
       }
 
-      // Extract apiKey from Cidaas
-      String? apiKey;
+      debugPrint('AhamaticApiService: Found module $moduleName');
+
+      // 6. Check if module has its own apiKey in Cidaas config (override)
       if (moduleConfig['Cidaas'] != null &&
           moduleConfig['Cidaas']['apiKey'] != null) {
         apiKey = moduleConfig['Cidaas']['apiKey'];
+        debugPrint(
+            'AhamaticApiService: Using module-specific apiKey from Cidaas');
       }
 
       // Check if Cidaas is enabled
@@ -145,7 +186,7 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
       // Get OpenIAM configuration
       String? openIamLogo;
       String? openIamTitle;
-      if (isOpeniamEnabled && moduleConfig['OpenIAMConfig'] != null) {
+      if (moduleConfig['OpenIAMConfig'] != null) {
         openIamLogo = moduleConfig['OpenIAMConfig']['logo'];
         openIamTitle = moduleConfig['OpenIAMConfig']['title'];
       }
@@ -154,6 +195,7 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
       final hostName = moduleConfig['HostName'] as String?;
 
       debugPrint('AhamaticApiService: Module config parsed successfully');
+      debugPrint('  - ApiKey: ${apiKey != null ? "found" : "not found"}');
       debugPrint('  - Cidaas enabled: $isCidaasEnabled');
       debugPrint('  - OpenIAM enabled: $isOpeniamEnabled');
 
