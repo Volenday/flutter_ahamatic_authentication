@@ -1,10 +1,158 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart';
 import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+
+// ============================================================================
+// ERROR HANDLING UTILITIES
+// ============================================================================
+
+/// Logs error details to console and returns a user-friendly message
+String _handleError(Object error, StackTrace stackTrace, String context) {
+  // Log detailed error to console
+  debugPrint('');
+  debugPrint('╔══════════════════════════════════════════════════════════════');
+  debugPrint('║ ❌ ERROR: $context');
+  debugPrint('╠══════════════════════════════════════════════════════════════');
+  debugPrint('║ Type: ${error.runtimeType}');
+  debugPrint('║ Message: $error');
+
+  // If it's a DioException, log HTTP details
+  if (error is DioException) {
+    debugPrint(
+        '╠══════════════════════════════════════════════════════════════');
+    debugPrint('║ HTTP DETAILS:');
+    debugPrint(
+        '╠══════════════════════════════════════════════════════════════');
+    debugPrint('║ Exception Type: ${error.type}');
+    debugPrint('║ Request URL: ${error.requestOptions.uri}');
+    debugPrint('║ Request Method: ${error.requestOptions.method}');
+
+    if (error.response != null) {
+      debugPrint('║ Status Code: ${error.response?.statusCode}');
+      debugPrint('║ Status Message: ${error.response?.statusMessage}');
+      debugPrint('║ Response Headers:');
+      error.response?.headers.forEach((name, values) {
+        debugPrint('║   $name: ${values.join(", ")}');
+      });
+      debugPrint('║ Response Body:');
+      final responseData = error.response?.data;
+      if (responseData != null) {
+        final bodyStr = responseData.toString();
+        // Truncate if too long
+        if (bodyStr.length > 500) {
+          debugPrint('║   ${bodyStr.substring(0, 500)}...');
+          debugPrint('║   (truncated, ${bodyStr.length} total characters)');
+        } else {
+          debugPrint('║   $bodyStr');
+        }
+      }
+    } else {
+      debugPrint('║ No response received from server');
+    }
+  }
+
+  debugPrint('╠══════════════════════════════════════════════════════════════');
+  debugPrint('║ STACK TRACE:');
+  debugPrint('╠══════════════════════════════════════════════════════════════');
+
+  // Print stack trace line by line for better readability
+  final stackLines = stackTrace.toString().split('\n');
+  for (final line in stackLines.take(15)) {
+    if (line.trim().isNotEmpty) {
+      debugPrint('║ $line');
+    }
+  }
+  if (stackLines.length > 15) {
+    debugPrint('║ ... (${stackLines.length - 15} more lines)');
+  }
+  debugPrint('╚══════════════════════════════════════════════════════════════');
+  debugPrint('');
+
+  // Return user-friendly message based on error type
+  if (error is DioException) {
+    return _getDioErrorMessage(error);
+  }
+
+  if (error is FormatException) {
+    return 'Invalid data format received. Please try again.';
+  }
+
+  if (error is TypeError) {
+    return 'Error processing server response. Please try again.';
+  }
+
+  final errorStr = error.toString().toLowerCase();
+
+  if (errorStr.contains('timeout') || errorStr.contains('timed out')) {
+    return 'Connection timed out. Please check your internet connection and try again.';
+  }
+
+  if (errorStr.contains('socket') ||
+      errorStr.contains('network') ||
+      errorStr.contains('connection')) {
+    return 'Connection error. Please check your internet connection and try again.';
+  }
+
+  if (errorStr.contains('unauthorized') || errorStr.contains('401')) {
+    return 'Invalid session. Please sign in again.';
+  }
+
+  if (errorStr.contains('forbidden') || errorStr.contains('403')) {
+    return 'You do not have permission to perform this action.';
+  }
+
+  // Generic message for unknown errors
+  return 'An unexpected error occurred. Please try again later.';
+}
+
+/// Get user-friendly message for Dio errors
+String _getDioErrorMessage(DioException error) {
+  switch (error.type) {
+    case DioExceptionType.connectionTimeout:
+    case DioExceptionType.sendTimeout:
+    case DioExceptionType.receiveTimeout:
+      return 'Connection timed out. Please check your internet connection and try again.';
+
+    case DioExceptionType.connectionError:
+      return 'Could not connect to the server. Please check your internet connection.';
+
+    case DioExceptionType.badCertificate:
+      return 'Security error in connection. Please contact technical support.';
+
+    case DioExceptionType.badResponse:
+      final statusCode = error.response?.statusCode;
+      switch (statusCode) {
+        case 400:
+          return 'Invalid request. Please verify the data and try again.';
+        case 401:
+          return 'Session expired or invalid credentials. Please sign in again.';
+        case 403:
+          return 'You do not have permission to perform this action.';
+        case 404:
+          return 'The requested resource was not found.';
+        case 500:
+        case 502:
+        case 503:
+          return 'The server is experiencing issues. Please try again later.';
+        default:
+          return 'Server error (code: $statusCode). Please try again later.';
+      }
+
+    case DioExceptionType.cancel:
+      return 'The operation was cancelled.';
+
+    case DioExceptionType.unknown:
+      if (error.message?.contains('SocketException') == true) {
+        return 'Could not connect to the server. Please check your internet connection.';
+      }
+      return 'A connection error occurred. Please try again.';
+  }
+}
 
 // ============================================================================
 // CONFIGURATION
@@ -202,9 +350,24 @@ class _LoginPageState extends State<LoginPage> {
               context.go('/home');
             },
             onAuthError: (error) {
-              debugPrint('Error: $error');
+              final userMessage = _handleError(
+                error,
+                StackTrace.current,
+                'Authentication error in FlutterAhaAuthentication',
+              );
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error: $error')),
+                SnackBar(
+                  content: Text(userMessage),
+                  backgroundColor: Colors.red[700],
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Dismiss',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    },
+                  ),
+                ),
               );
             },
           ),
@@ -273,7 +436,19 @@ class _CallbackPageState extends State<CallbackPage>
     debugPrint('═══════════════════════════════════════════════════════');
 
     if (!PlatformService.isWeb) {
-      setState(() => _error = 'Only works on web');
+      debugPrint('');
+      debugPrint(
+          '╔══════════════════════════════════════════════════════════════');
+      debugPrint('║ ❌ ERROR: Platform not supported');
+      debugPrint(
+          '╠══════════════════════════════════════════════════════════════');
+      debugPrint('║ The callback page only works on web platform.');
+      debugPrint('║ On mobile, the callback is handled natively.');
+      debugPrint(
+          '╚══════════════════════════════════════════════════════════════');
+      debugPrint('');
+      setState(
+          () => _error = 'This feature is only available in the web version.');
       return;
     }
 
@@ -294,7 +469,21 @@ class _CallbackPageState extends State<CallbackPage>
           '🔑 ApiKey obtained: ${apiKey.isEmpty ? "(empty)" : "${apiKey.substring(0, 10)}..."}');
 
       if (apiKey.isEmpty) {
-        setState(() => _error = 'Could not get the apiKey from module');
+        debugPrint('');
+        debugPrint(
+            '╔══════════════════════════════════════════════════════════════');
+        debugPrint('║ ❌ ERROR: API Key not found');
+        debugPrint(
+            '╠══════════════════════════════════════════════════════════════');
+        debugPrint(
+            '║ Could not retrieve the apiKey from module configuration.');
+        debugPrint('║ Module: abenadata / abenaRestock');
+        debugPrint('║ Please verify that the module is properly configured.');
+        debugPrint(
+            '╚══════════════════════════════════════════════════════════════');
+        debugPrint('');
+        setState(() => _error =
+            'Configuration error: Could not retrieve the API key from the module. Please contact the administrator.');
         return;
       }
 
@@ -312,9 +501,25 @@ class _CallbackPageState extends State<CallbackPage>
       debugPrint('🔑 handleCallback executed');
 
       if (authResult == null) {
-        debugPrint('❌ authResult is null');
-        setState(
-            () => _error = 'Authorization code not found or state mismatch');
+        debugPrint('');
+        debugPrint(
+            '╔══════════════════════════════════════════════════════════════');
+        debugPrint('║ ❌ ERROR: Authorization code not found');
+        debugPrint(
+            '╠══════════════════════════════════════════════════════════════');
+        debugPrint('║ The authorization code was not found in the URL');
+        debugPrint(
+            '║ or the "state" parameter does not match the expected value.');
+        debugPrint('║ This can happen if:');
+        debugPrint('║   - The session expired during the login process');
+        debugPrint(
+            '║   - The /callback page was accessed directly without prior authorization');
+        debugPrint('║   - There was a security issue (CSRF)');
+        debugPrint(
+            '╚══════════════════════════════════════════════════════════════');
+        debugPrint('');
+        setState(() =>
+            _error = 'Authorization code not found. Please sign in again.');
         return;
       }
 
@@ -350,10 +555,13 @@ class _CallbackPageState extends State<CallbackPage>
       await Future.delayed(const Duration(milliseconds: 600));
 
       if (mounted) context.go('/home');
-    } catch (e, stack) {
-      debugPrint('❌ Error in callback: $e');
-      debugPrint('Stack: $stack');
-      setState(() => _error = e.toString());
+    } catch (e, stackTrace) {
+      final userMessage = _handleError(
+        e,
+        stackTrace,
+        'OAuth callback processing',
+      );
+      setState(() => _error = userMessage);
     }
   }
 

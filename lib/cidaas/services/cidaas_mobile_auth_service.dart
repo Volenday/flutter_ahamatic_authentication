@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 
 import '../models/models.dart';
+import '../utils/error_handler.dart';
 import 'cidaas_auth_api.dart';
 import 'ahamatic_token_service.dart';
 
@@ -110,10 +111,12 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         null, // tokenAdditionalParameters
       );
     } on PlatformException catch (e, stack) {
-      debugPrint('CidaasMobileAuthService: PlatformException: ${e.code}');
-      if (kDebugMode) {
-        debugPrint('CidaasMobileAuthService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Sign-in with Cidaas (PlatformException)',
+        serviceName: 'CidaasMobileAuthService',
+      );
 
       // Specific handling for user cancellation
       if (e.code == 'authorize_failed' &&
@@ -124,21 +127,26 @@ class CidaasMobileAuthService implements CidaasAuthApi {
           details: e.details,
         );
       }
+
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw PlatformException(
         code: e.code,
-        message: 'Platform authentication error: ${e.message}',
+        message: userMessage,
         details: e.details,
         stacktrace: stack.toString(),
       );
     } catch (e, stack) {
-      debugPrint('CidaasMobileAuthService: Unexpected error during sign-in');
-      if (kDebugMode) {
-        debugPrint('CidaasMobileAuthService: $e');
-        debugPrint('CidaasMobileAuthService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Sign-in with Cidaas (unexpected error)',
+        serviceName: 'CidaasMobileAuthService',
+      );
+
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw PlatformException(
         code: 'unexpected_error',
-        message: 'An unexpected error occurred during sign in: $e',
+        message: userMessage,
         details: null,
         stacktrace: stack.toString(),
       );
@@ -167,9 +175,6 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         debugPrint('CidaasMobileAuthService: Sign-out completed');
       }
     } on PlatformException catch (e, stack) {
-      debugPrint(
-          'CidaasMobileAuthService: PlatformException during sign-out: ${e.code}');
-
       // User cancellation is not an error
       if (e.code == 'end_session_failed' &&
           (e.details?.toString().contains('User cancelled') ?? false)) {
@@ -177,25 +182,32 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         return;
       }
 
-      if (kDebugMode) {
-        debugPrint('CidaasMobileAuthService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Sign-out from Cidaas (PlatformException)',
+        serviceName: 'CidaasMobileAuthService',
+      );
 
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw PlatformException(
         code: e.code,
-        message: 'Sign-out error: ${e.message}',
+        message: userMessage,
         details: e.details,
         stacktrace: stack.toString(),
       );
     } catch (e, stack) {
-      debugPrint('CidaasMobileAuthService: Unexpected error during sign-out');
-      if (kDebugMode) {
-        debugPrint('CidaasMobileAuthService: $e');
-        debugPrint('CidaasMobileAuthService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Sign-out from Cidaas (unexpected error)',
+        serviceName: 'CidaasMobileAuthService',
+      );
+
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw PlatformException(
         code: 'signout_error',
-        message: 'An unexpected error occurred during sign-out: $e',
+        message: userMessage,
         details: null,
         stacktrace: stack.toString(),
       );

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/utils/error_handler.dart';
 import 'package:flutter_ahamatic_authentication/models/app_config.dart';
 
 /// Interface for the Ahamatic API service
@@ -50,10 +51,16 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
           statusCode: response.statusCode,
         );
       }
-    } on DioException catch (e) {
-      debugPrint('AhamaticApiService: DioException: ${e.message}');
+    } on DioException catch (e, stack) {
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Validating app: $applicationCode',
+        serviceName: 'AhamaticApiService',
+      );
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw AhamaticApiException(
-        'Network error: ${e.message}',
+        userMessage,
         statusCode: e.response?.statusCode,
       );
     }
@@ -80,10 +87,16 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
           statusCode: response.statusCode,
         );
       }
-    } on DioException catch (e) {
-      debugPrint('AhamaticApiService: DioException: ${e.message}');
+    } on DioException catch (e, stack) {
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Getting module config: $moduleName for app: $applicationCode',
+        serviceName: 'AhamaticApiService',
+      );
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
       throw AhamaticApiException(
-        'Network error: ${e.message}',
+        userMessage,
         statusCode: e.response?.statusCode,
       );
     }
@@ -207,8 +220,13 @@ class AhamaticApiServiceImpl implements AhamaticApiService {
         openIamTitle: openIamTitle,
         hostName: hostName,
       );
-    } catch (e) {
-      debugPrint('AhamaticApiService: Error parsing module config: $e');
+    } catch (e, stack) {
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Parsing module config: $moduleName',
+        serviceName: 'AhamaticApiService',
+      );
       return ModuleAuthConfig.empty();
     }
   }

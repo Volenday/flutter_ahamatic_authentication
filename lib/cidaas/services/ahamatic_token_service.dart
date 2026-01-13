@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/models.dart';
+import '../utils/error_handler.dart';
 
 /// Service for handling Ahamatic token operations.
 ///
@@ -53,17 +54,22 @@ class AhamaticTokenService {
         details: response.data,
       );
     } catch (e, stack) {
-      debugPrint('AhamaticTokenService: Email login failed');
-      if (kDebugMode) {
-        debugPrint('AhamaticTokenService: Error: $e');
-        debugPrint('AhamaticTokenService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Email login to Ahamatic',
+        serviceName: 'AhamaticTokenService',
+      );
 
       if (e is PlatformException) rethrow;
 
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(
+        e,
+        fallbackMessage: 'Failed to authenticate with Ahamatic. Please try again.',
+      );
       throw PlatformException(
         code: 'ahamatic_login_error',
-        message: 'Error logging in to Ahamatic: $e',
+        message: userMessage,
         details: null,
         stacktrace: stack.toString(),
       );
@@ -126,14 +132,20 @@ class AhamaticTokenService {
         idToken: response.data['token'],
       );
     } catch (e, stack) {
-      debugPrint('AhamaticTokenService: Token fetch failed');
-      if (kDebugMode) {
-        debugPrint('AhamaticTokenService: Error: $e');
-        debugPrint('AhamaticTokenService: Stack trace: $stack');
-      }
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Fetching Ahamatic tokens',
+        serviceName: 'AhamaticTokenService',
+      );
+
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(
+        e,
+        fallbackMessage: 'Failed to retrieve authentication tokens. Please try again.',
+      );
       throw PlatformException(
         code: 'ahamatic_token_error',
-        message: 'Error fetching Ahamatic tokens: $e',
+        message: userMessage,
         details: null,
         stacktrace: stack.toString(),
       );

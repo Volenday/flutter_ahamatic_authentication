@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:universal_html/html.dart' as html;
 
 import '../models/models.dart';
+import '../utils/error_handler.dart';
 import '../utils/pkce_utils.dart';
 import 'ahamatic_token_service.dart';
 
@@ -135,8 +136,13 @@ class CidaasWebAuthService {
               completer.complete(null);
             }
           }
-        } catch (e) {
-          debugPrint('CidaasWebAuthService: Error parsing callback message');
+        } catch (e, stack) {
+          CidaasErrorHandler.logError(
+            e,
+            stack,
+            'Error parsing OAuth callback message',
+            serviceName: 'CidaasWebAuthService',
+          );
         }
       }
     };
@@ -235,8 +241,13 @@ class CidaasWebAuthService {
         expiresIn: response.data['expires_in'],
         tokenType: response.data['token_type'],
       );
-    } catch (e) {
-      debugPrint('CidaasWebAuthService: Token exchange failed');
+    } catch (e, stack) {
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'Token exchange failed',
+        serviceName: 'CidaasWebAuthService',
+      );
       rethrow;
     }
   }
