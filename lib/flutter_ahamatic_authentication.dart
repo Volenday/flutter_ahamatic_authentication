@@ -146,6 +146,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   String? _hostName;
   String? _openiamLoginUrl;
 
+  // iOS Cidaas workaround: first attempt prepares the session, second completes it
+  bool _cidaasFirstAttemptDone = false;
+
   // Development credentials
   final _devAccount = {
     'emailAddress': 'developers@volenday.com',
@@ -381,6 +384,19 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       return;
     }
 
+    // iOS workaround: Mark first attempt immediately when user taps the button
+    // This ensures the button changes to "Continue" when user returns from browser
+    final isFirstIOSAttempt = PlatformService.isIOS && !_cidaasFirstAttemptDone;
+    if (isFirstIOSAttempt) {
+      debugPrint('iOS: Marking first Cidaas attempt...');
+      _cidaasFirstAttemptDone = true;
+      if (mounted) {
+        setState(() {});
+        // Small delay to ensure UI updates before opening browser
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    }
+
     try {
       if (PlatformService.isWeb) {
         // Web: Use OAuth2 redirect flow
@@ -536,6 +552,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   Widget _buildAuthButtons(BuildContext context, bool isPhone) {
     // Always use local assets for both Cidaas and OpenIAM to avoid
     // CORS issues on web and network loading issues on mobile
+
+    // iOS workaround: after first attempt, show "Continue" button
+    debugPrint(
+        '🔘 Button state - isIOS: ${PlatformService.isIOS}, firstAttemptDone: $_cidaasFirstAttemptDone');
+    final cidaasButtonName = (PlatformService.isIOS && _cidaasFirstAttemptDone)
+        ? 'Continue'
+        : 'Cidaas';
+    debugPrint('🔘 Button name: $cidaasButtonName');
+
     return Wrap(
       alignment: WrapAlignment.center,
       spacing: 20,
@@ -543,10 +568,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       children: [
         if (_isCidaasEnabled)
           _SignInAlternatives(
-            name: 'Cidaas',
+            name: cidaasButtonName,
             logo: _cidaasLogoAsset,
             isAsset: true,
             onPressed: _launchCidaasLogin,
+            // Show highlight effect after first attempt on iOS
+            highlighted: PlatformService.isIOS && _cidaasFirstAttemptDone,
           ),
         if (_isOpeniamEnabled)
           _SignInAlternatives(
@@ -580,12 +607,14 @@ class _SignInAlternatives extends StatelessWidget {
   final String name;
   final bool isAsset;
   final VoidCallback onPressed;
+  final bool highlighted;
 
   const _SignInAlternatives({
     required this.logo,
     required this.name,
     required this.onPressed,
     this.isAsset = false,
+    this.highlighted = false,
   });
 
   @override
@@ -599,12 +628,16 @@ class _SignInAlternatives extends StatelessWidget {
         ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
+            backgroundColor:
+                highlighted ? Colors.blue.shade50 : Colors.transparent,
+            elevation: highlighted ? 2 : 0,
             padding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: Colors.grey),
+              side: BorderSide(
+                color: highlighted ? Colors.blue : Colors.grey,
+                width: highlighted ? 2 : 1,
+              ),
             ),
           ),
           child: Container(
@@ -617,7 +650,11 @@ class _SignInAlternatives extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           name,
-          style: TextStyle(fontSize: isPhone ? 12 : 14),
+          style: TextStyle(
+            fontSize: isPhone ? 12 : 14,
+            fontWeight: highlighted ? FontWeight.bold : FontWeight.normal,
+            color: highlighted ? Colors.blue : null,
+          ),
           textAlign: TextAlign.center,
         ),
       ],
