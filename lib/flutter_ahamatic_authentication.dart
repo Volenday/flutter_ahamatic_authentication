@@ -40,6 +40,55 @@ const _openIamLogoAsset = 'assets/openiam/abena_logo.png';
 /// Supported login types
 enum LoginType { azure, mitId, openIAM, cidaas }
 
+/// Controller to trigger login flows from custom buttons without using
+/// the library's built-in UI. Create an [AhamaticAuthController], pass it
+/// to [FlutterAhaAuthentication], then call [launchOpenIamLogin] or
+/// [launchCidaasLogin] from your own buttons.
+///
+/// Example:
+/// ```dart
+/// final authController = AhamaticAuthController();
+///
+/// // In the widget tree (e.g. above your screen so it stays mounted):
+/// FlutterAhaAuthentication(
+///   controller: authController,
+///   applicationCode: '...',
+///   environment: '...',
+///   europe: true,
+///   onAuthSuccess: (...) { ... },
+///   onAuthError: (...) { ... },
+/// );
+///
+/// // In your custom button:
+/// ElevatedButton(
+///   onPressed: () => authController.launchOpenIamLogin(),
+///   child: Text('Log in as citizen'),
+/// )
+/// ```
+class AhamaticAuthController {
+  VoidCallback? _onOpenIamLogin;
+  VoidCallback? _onCidaasLogin;
+
+  /// Called by [FlutterAhaAuthentication] to register the login actions.
+  /// Do not call this directly.
+  void setLaunchCallbacks(VoidCallback openIamLogin, VoidCallback? cidaasLogin) {
+    _onOpenIamLogin = openIamLogin;
+    _onCidaasLogin = cidaasLogin;
+  }
+
+  /// Launches the OpenIAM (e.g. "Log in as citizen") login flow.
+  /// No-op if the widget has not yet registered callbacks.
+  void launchOpenIamLogin() {
+    _onOpenIamLogin?.call();
+  }
+
+  /// Launches the Cidaas login flow.
+  /// No-op if Cidaas is not enabled or callbacks are not registered.
+  void launchCidaasLogin() {
+    _onCidaasLogin?.call();
+  }
+}
+
 /// Main Ahamatic authentication widget
 ///
 /// Provides an authentication interface with support for:
@@ -101,6 +150,11 @@ class FlutterAhaAuthentication extends StatefulWidget {
   /// Authentication error callback
   final AuthErrorCallback? onAuthError;
 
+  /// Optional controller to trigger login from custom buttons.
+  /// When set, the widget renders nothing ([SizedBox.shrink]) and
+  /// registers its login actions with the controller.
+  final AhamaticAuthController? controller;
+
   const FlutterAhaAuthentication({
     super.key,
     this.isLoginButtonOnly,
@@ -118,6 +172,7 @@ class FlutterAhaAuthentication extends StatefulWidget {
     this.cidaasConfiguration,
     this.onAuthSuccess,
     this.onAuthError,
+    this.controller,
     required this.applicationCode,
     required this.environment,
     required this.europe,
@@ -459,6 +514,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.controller != null) {
+      widget.controller!.setLaunchCallbacks(
+        () => _launchOpenIamLogin(context),
+        _isCidaasEnabled ? () => _launchCidaasLogin() : null,
+      );
+      return const SizedBox.shrink();
+    }
+
     final isLoginButtonOnly = widget.isLoginButtonOnly ?? false;
 
     return isLoginButtonOnly

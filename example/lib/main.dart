@@ -292,6 +292,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _assetsPreloaded = false;
+  bool _useCustomButtons = false;
+  final _authController = AhamaticAuthController();
 
   @override
   void didChangeDependencies() {
@@ -328,50 +330,167 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _onAuthSuccess(
+      {String? accessToken, String? refreshToken, String? idToken}) {
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
+    _idToken = idToken;
+    if (mounted) context.go('/home');
+  }
+
+  void _onAuthError(String error) {
+    final userMessage = _handleError(
+      error,
+      StackTrace.current,
+      'Authentication error in FlutterAhaAuthentication',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(userMessage),
+        backgroundColor: Colors.red[700],
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[300],
       appBar: AppBar(title: const Text('Plugin example app')),
       body: SafeArea(
-        child: Center(
-          child: FlutterAhaAuthentication(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Default form'),
+                    selected: !_useCustomButtons,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _useCustomButtons = false);
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  ChoiceChip(
+                    label: const Text('Custom buttons (Controller)'),
+                    selected: _useCustomButtons,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _useCustomButtons = true);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: _useCustomButtons
+                    ? _buildCustomButtonsExample(context)
+                    : FlutterAhaAuthentication(
+                        moduleName: 'abenaRestock',
+                        moduleWebName: 'abenaRestock',
+                        projectLogoAsset: 'assets/images/sample_logo.png',
+                        applicationCode: 'abenadata',
+                        environment: 'development',
+                        europe: true,
+                        cidaasConfiguration: getCidaasConfig(),
+                        onAuthSuccess: _onAuthSuccess,
+                        onAuthError: _onAuthError,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Example: login using [AhamaticAuthController] with your own buttons.
+  /// The widget is in the tree only to wire the controller; it renders
+  /// [SizedBox.shrink]. Your buttons call [launchOpenIamLogin] and
+  /// [launchCidaasLogin].
+  Widget _buildCustomButtonsExample(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Widget with controller: registers callbacks, renders nothing
+          FlutterAhaAuthentication(
+            controller: _authController,
             moduleName: 'abenaRestock',
             moduleWebName: 'abenaRestock',
-            projectLogoAsset: 'assets/images/sample_logo.png',
             applicationCode: 'abenadata',
             environment: 'development',
             europe: true,
             cidaasConfiguration: getCidaasConfig(),
-            onAuthSuccess: ({accessToken, refreshToken, idToken}) {
-              _accessToken = accessToken;
-              _refreshToken = refreshToken;
-              _idToken = idToken;
-              context.go('/home');
-            },
-            onAuthError: (error) {
-              final userMessage = _handleError(
-                error,
-                StackTrace.current,
-                'Authentication error in FlutterAhaAuthentication',
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(userMessage),
-                  backgroundColor: Colors.red[700],
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Dismiss',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    },
-                  ),
-                ),
-              );
-            },
+            onAuthSuccess: _onAuthSuccess,
+            onAuthError: _onAuthError,
           ),
-        ),
+          const SizedBox(height: 24),
+          const Text(
+            'Custom buttons (Controller)',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'These buttons use the same login logic via AhamaticAuthController.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: MediaQuery.of(context).size.width,
+            child: ElevatedButton(
+              onPressed: () => _authController.launchOpenIamLogin(),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.green,
+                minimumSize: const Size(40, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(3.0),
+                ),
+              ),
+              child: const Text(
+                'Log ind som borger',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: MediaQuery.of(context).size.width,
+            child: OutlinedButton(
+              onPressed: () => _authController.launchCidaasLogin(),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(40, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(3.0),
+                ),
+              ),
+              child: const Text(
+                'Log in with Cidaas',
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
