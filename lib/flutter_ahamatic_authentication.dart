@@ -71,7 +71,8 @@ class AhamaticAuthController {
 
   /// Called by [FlutterAhaAuthentication] to register the login actions.
   /// Do not call this directly.
-  void setLaunchCallbacks(VoidCallback openIamLogin, VoidCallback? cidaasLogin) {
+  void setLaunchCallbacks(
+      VoidCallback openIamLogin, VoidCallback? cidaasLogin) {
     _onOpenIamLogin = openIamLogin;
     _onCidaasLogin = cidaasLogin;
   }
