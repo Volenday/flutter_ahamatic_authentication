@@ -197,6 +197,8 @@ final cidaasWebConfig = CidaasConfiguration(
   scopes: ['openid', 'profile', 'email', 'offline_access'],
   redirectWebUri: 'http://localhost:8080/callback',
   postLogoutWebUri: 'http://localhost:8080/',
+  // Set cidaasClientIdMitID to show the MitID button (use your MitID client ID)
+  // cidaasClientIdMitID: 'your-mitid-client-id',
 );
 
 /// Gets the Cidaas configuration based on the platform
@@ -485,11 +487,31 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               child: const Text(
-                'Log in with Cidaas',
+                'Log in with Cidaas (classic)',
                 style: TextStyle(fontSize: 14),
               ),
             ),
           ),
+          if (getCidaasConfig().cidaasClientIdMitID != null &&
+              getCidaasConfig().cidaasClientIdMitID!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: MediaQuery.of(context).size.width,
+              child: OutlinedButton(
+                onPressed: () => _authController.launchMitIdLogin(),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(40, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(3.0),
+                  ),
+                ),
+                child: const Text(
+                  'Log in with MitID',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
