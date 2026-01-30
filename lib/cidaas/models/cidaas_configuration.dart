@@ -30,6 +30,17 @@ class CidaasConfiguration {
   /// Additional custom parameters for the authorization request
   final Map<String, String>? customParameter;
 
+  /// Optional Cidaas client ID for MitID. When non-empty, this value is used
+  /// instead of [clientId] for the Cidaas flow. When null or empty, [clientId] is used.
+  final String? cidaasClientIdMitID;
+
+  /// Client ID used in the Cidaas flow. If [cidaasClientIdMitID] is non-empty,
+  /// that value is used (MitID); otherwise [clientId].
+  String get effectiveClientId {
+    final mitId = cidaasClientIdMitID?.trim();
+    return (mitId != null && mitId.isNotEmpty) ? mitId : clientId;
+  }
+
   CidaasConfiguration({
     required this.clientId,
     required this.issuer,
@@ -40,6 +51,7 @@ class CidaasConfiguration {
     this.redirectWebUri,
     this.postLogoutWebUri,
     this.customParameter,
+    this.cidaasClientIdMitID,
   });
 
   @override
