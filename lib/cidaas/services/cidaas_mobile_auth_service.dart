@@ -89,6 +89,8 @@ class CidaasMobileAuthService implements CidaasAuthApi {
 
       debugPrint(
           'CidaasMobileAuthService: [STEP 1/4] Authorization successful (code received: ${authResponse.authorizationCode != null})');
+      debugPrint(
+          'CidaasMobileAuthService: [STEP 1/4] authResponse: codeLen=${authResponse.authorizationCode?.length ?? 0} hasCodeVerifier=${authResponse.codeVerifier != null} hasNonce=${authResponse.nonce != null}');
 
       // 2. Token Exchange Request
       debugPrint(
@@ -114,6 +116,8 @@ class CidaasMobileAuthService implements CidaasAuthApi {
 
       debugPrint(
           'CidaasMobileAuthService: [STEP 2/4] Token exchange successful (accessToken: ${tokenResponse.accessToken != null})');
+      debugPrint(
+          'CidaasMobileAuthService: [STEP 2/4] tokenResponse: accessTokenLen=${tokenResponse.accessToken?.length ?? 0} refreshTokenLen=${tokenResponse.refreshToken?.length ?? 0} idTokenLen=${tokenResponse.idToken?.length ?? 0}');
 
       // 3. Login to Ahamatic
       debugPrint(
@@ -155,7 +159,7 @@ class CidaasMobileAuthService implements CidaasAuthApi {
       );
     } on PlatformException catch (e, stack) {
       debugPrint(
-          'CidaasMobileAuthService: [ERROR] PlatformException code=${e.code} message=${e.message}');
+          'CidaasMobileAuthService: [ERROR] PlatformException code=${e.code} message=${e.message} details=${e.details}');
       CidaasErrorHandler.logError(
         e,
         stack,
