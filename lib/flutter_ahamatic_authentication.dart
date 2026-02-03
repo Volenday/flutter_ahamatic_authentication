@@ -289,6 +289,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   /// Loads initial application data
   Future<void> _loadInitialData() async {
+    debugPrint(
+      'FlutterAhaAuthentication: [INIT] environment=${widget.environment}, '
+      'europe=${widget.europe}, '
+      'applicationCode=${widget.applicationCode}, '
+      'moduleName=${widget.moduleName}, '
+      'moduleWebName=${widget.moduleWebName}, '
+      'apiUrl=${_envConfig.apiUrl}, '
+      'portalUrl=${_envConfig.portalUrl}, '
+      'initialApiKey=$_apiKey',
+    );
     await _fetchModuleConfig();
     await _fetchLoginUrl();
   }
@@ -318,7 +328,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       }
 
       debugPrint(
-          'Module config loaded: Cidaas=$_isCidaasEnabled, OpenIAM=$_isOpeniamEnabled');
+        'FlutterAhaAuthentication: [MODULE_CONFIG] '
+        'projectName=$_projectName, '
+        'apiKey=$_apiKey, '
+        'cidaasEnabled=$_isCidaasEnabled, '
+        'openIamEnabled=$_isOpeniamEnabled, '
+        'hostName=$_hostName',
+      );
     } on AhamaticApiException catch (e) {
       debugPrint('Error fetching module config: $e');
     }
