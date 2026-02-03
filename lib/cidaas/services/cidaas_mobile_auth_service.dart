@@ -167,11 +167,12 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         serviceName: 'CidaasMobileAuthService',
       );
 
-      // Specific handling for user cancellation
+      // Specific handling for user cancellation - use special code to indicate manual cancellation
       if (e.code == 'authorize_failed' &&
           (e.details?.toString().contains('User cancelled flow') ?? false)) {
+        debugPrint('CidaasMobileAuthService: User manually cancelled authentication');
         throw PlatformException(
-          code: e.code,
+          code: CidaasErrorHandler.userCancelledCode,
           message: 'User cancelled the authentication flow.',
           details: e.details,
         );

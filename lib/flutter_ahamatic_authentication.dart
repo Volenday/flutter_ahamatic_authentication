@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/utils/error_handler.dart';
 import 'package:flutter_ahamatic_authentication/models/app_config.dart';
 import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
 import 'package:flutter_ahamatic_authentication/services/openiam_auth_service.dart';
@@ -452,7 +453,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           widget.onAuthError?.call(error);
         },
         onClose: () {
-          debugPrint('Auth dialog closed by user');
+          // User manually closed the dialog - this is not an error, just log it
+          debugPrint('FlutterAhaAuthentication: [INFO] Auth dialog closed by user (manual cancellation)');
+          // Note: We don't call onAuthError here because closing the dialog is a normal user action
         },
       );
     }
@@ -526,14 +529,30 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         await _launchCidaasLoginMobile(config, clientId);
       }
     } on PlatformException catch (e) {
+      // Check if this is a user cancellation (manual action, not an error)
+      if (e.code == CidaasErrorHandler.userCancelledCode) {
+        debugPrint(
+            'FlutterAhaAuthentication: [INFO] User manually cancelled authentication');
+        // Don't call onAuthError for manual cancellations - it's a normal user action
+        return;
+      }
+
+      // Real error - log and notify
       debugPrint(
           'FlutterAhaAuthentication: [ERROR] Cidaas PlatformException: ${e.code} ${e.message}');
       widget.onAuthError
           ?.call(e.message ?? 'An unknown platform error occurred.');
     } catch (e, stack) {
+      // Unexpected error - provide better error message
       debugPrint(
-          'FlutterAhaAuthentication: [ERROR] Cidaas unexpected: $e\n$stack');
-      widget.onAuthError?.call('An unexpected error occurred: $e');
+          'FlutterAhaAuthentication: [ERROR] Cidaas unexpected error: $e');
+      debugPrint('FlutterAhaAuthentication: [ERROR] Stack trace: $stack');
+      
+      final errorMessage = e is DioException
+          ? CidaasErrorHandler.getUserFriendlyMessage(e)
+          : 'An unexpected error occurred during authentication. Please try again.';
+      
+      widget.onAuthError?.call(errorMessage);
     }
   }
 
