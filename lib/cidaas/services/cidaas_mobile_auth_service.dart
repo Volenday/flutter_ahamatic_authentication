@@ -222,6 +222,98 @@ class CidaasMobileAuthService implements CidaasAuthApi {
     }
   }
 
+  /// Completes MitID sign-in when the authorization code was obtained from the
+  /// full [mitIdAuthUrl] flow (e.g. WebView). Exchanges [code] for Cidaas tokens,
+  /// then Ahamatic login and token exchange.
+  ///
+  /// [clientId] - MitID client ID (e.g. [CidaasConfiguration.cidaasClientIdMitID]).
+  /// [issuer] - Issuer base URL (e.g. from [CidaasConfiguration.mitIdEffectiveIssuer]).
+  Future<TokenResponse> signInWithCidaasCode(
+    String apiKey,
+    String apiUrl,
+    String code,
+    String codeVerifier,
+    String clientId,
+    String issuer,
+  ) async {
+    debugPrint(
+        'CidaasMobileAuthService: ═══ MitID sign-in with code (full URL flow) ═══');
+    final tokenUrl = '$issuer/token-srv/token';
+    debugPrint(
+        'CidaasMobileAuthService: [STEP 1/4] Exchanging code at $tokenUrl');
+
+    try {
+      final response = await _dio.post(
+        tokenUrl,
+        data: {
+          'grant_type': 'authorization_code',
+          'client_id': clientId,
+          'code': code,
+          'redirect_uri': config.redirectUri,
+          'code_verifier': codeVerifier,
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+        ),
+      );
+
+      final accessToken = response.data['access_token'] as String?;
+      if (accessToken == null) {
+        throw PlatformException(
+          code: 'invalid_response',
+          message: 'No access_token in token response',
+          details: response.data,
+        );
+      }
+
+      debugPrint(
+          'CidaasMobileAuthService: [STEP 2/4] Logging in to Ahamatic...');
+      final ahamaticLoginResponse = await _ahamaticService.loginEmail(
+        apiKey,
+        apiUrl,
+      );
+
+      debugPrint(
+          'CidaasMobileAuthService: [STEP 3/4] Fetching Ahamatic tokens...');
+      final ahamaticResponse = await _ahamaticService.fetchTokens(
+        accessToken: accessToken,
+        apiUrl: apiUrl,
+        apiKey: apiKey,
+        ahamaticToken: ahamaticLoginResponse,
+        clientId: clientId,
+        redirectUrl: config.redirectUri,
+        issuer: issuer,
+      );
+
+      debugPrint(
+          'CidaasMobileAuthService: [STEP 4/4] MitID sign-in with code completed');
+      return TokenResponse(
+        ahamaticResponse.accessToken,
+        ahamaticResponse.refreshToken,
+        null,
+        ahamaticResponse.idToken,
+        null,
+        null,
+        null,
+      );
+    } catch (e, stack) {
+      CidaasErrorHandler.logError(
+        e,
+        stack,
+        'MitID sign-in with code',
+        serviceName: 'CidaasMobileAuthService',
+      );
+      if (e is PlatformException) rethrow;
+      final userMessage = CidaasErrorHandler.getUserFriendlyMessage(e);
+      throw PlatformException(
+        code: 'ahamatic_login_error',
+        message: userMessage,
+        details: null,
+        stacktrace: stack.toString(),
+      );
+    }
+  }
+
   @override
   Future<void> signOut(String? idToken) async {
     debugPrint('CidaasMobileAuthService: ═══ Starting sign-out process ═══');

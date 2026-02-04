@@ -16,7 +16,9 @@ import 'package:flutter_ahamatic_authentication/services/openiam_auth_service.da
 import 'package:flutter_ahamatic_authentication/services/auth_logging_service.dart';
 import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 import 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/utils/pkce_utils.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -524,9 +526,18 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             'FlutterAhaAuthentication: [DEBUG] starting Cidaas web flow');
         await _launchCidaasLoginWeb(config, clientId);
       } else {
-        debugPrint(
-            'FlutterAhaAuthentication: [DEBUG] starting Cidaas mobile flow');
-        await _launchCidaasLoginMobile(config, clientId);
+        final isMitIdFlow = config.cidaasClientIdMitID?.trim().isNotEmpty == true &&
+            clientId == config.cidaasClientIdMitID?.trim();
+        final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
+        if (isMitIdFlow && mitIdAuthUrl != null && mitIdAuthUrl.isNotEmpty) {
+          debugPrint(
+              'FlutterAhaAuthentication: [DEBUG] starting MitID mobile flow (full URL)');
+          await _launchMitIdLoginMobileWithFullUrl(config, clientId);
+        } else {
+          debugPrint(
+              'FlutterAhaAuthentication: [DEBUG] starting Cidaas mobile flow');
+          await _launchCidaasLoginMobile(config, clientId);
+        }
       }
     } on PlatformException catch (e) {
       // Check if this is a user cancellation (manual action, not an error)
@@ -567,6 +578,141 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     cidaasWebAuth.initiateAuthFlow(clientIdOverride: clientIdOverride);
 
     // Note: The flow continues when the user returns to the callback URL.
+  }
+
+  /// Launches MitID login on mobile using the full [mitIdAuthUrl].
+  /// Opens the URL in a WebView with PKCE and app redirect_uri; intercepts
+  /// the callback and exchanges the code for tokens.
+  Future<void> _launchMitIdLoginMobileWithFullUrl(
+      CidaasConfiguration config, String clientId) async {
+    final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
+    final issuer = config.mitIdEffectiveIssuer;
+    if (mitIdAuthUrl == null ||
+        mitIdAuthUrl.isEmpty ||
+        issuer == null ||
+        issuer.isEmpty) {
+      widget.onAuthError?.call('MitID URL or issuer not configured.');
+      return;
+    }
+
+    final codeVerifier = PkceUtils.generateCodeVerifier();
+    final codeChallenge = PkceUtils.generateCodeChallenge(codeVerifier);
+    final state = PkceUtils.generateState();
+    final scopes = config.scopes.isNotEmpty
+        ? config.scopes.join(' ')
+        : 'openid profile email';
+
+    final baseUri = Uri.parse(mitIdAuthUrl);
+    final params = Map<String, String>.from(baseUri.queryParameters)
+      ..['state'] = state
+      ..['code_challenge'] = codeChallenge
+      ..['code_challenge_method'] = 'S256'
+      ..['redirect_uri'] = config.redirectUri;
+    if (!params.containsKey('scope') || params['scope']!.isEmpty) {
+      params['scope'] = scopes;
+    }
+    final authUrl = baseUri.replace(queryParameters: params);
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile): ${authUrl.origin}${authUrl.path}?...');
+
+    if (!mounted || !context.mounted) return;
+    String? receivedCode;
+    String? receivedState;
+    final navigator = Navigator.of(context);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: MediaQuery.of(dialogContext).size.width * 0.9,
+            height: MediaQuery.of(dialogContext).size.height * 0.85,
+            child: Column(
+              children: [
+                AppBar(
+                  title: const Text('MitID Login'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => navigator.pop(),
+                  ),
+                ),
+                Expanded(
+                  child: WebViewWidget(
+                    controller: WebViewController()
+                      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                      ..setNavigationDelegate(
+                        NavigationDelegate(
+                          onNavigationRequest: (request) {
+                            final uri = Uri.parse(request.url);
+                            if (uri.toString().startsWith(config.redirectUri) &&
+                                uri.queryParameters.containsKey('code') &&
+                                uri.queryParameters.containsKey('state')) {
+                              receivedCode = uri.queryParameters['code'];
+                              receivedState = uri.queryParameters['state'];
+                              navigator.pop();
+                              return NavigationDecision.prevent;
+                            }
+                            if (uri.queryParameters.containsKey('error')) {
+                              navigator.pop();
+                              return NavigationDecision.prevent;
+                            }
+                            return NavigationDecision.navigate;
+                          },
+                        ),
+                      )
+                      ..loadRequest(authUrl),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (receivedCode == null || receivedState == null) {
+      debugPrint(
+          'FlutterAhaAuthentication: [INFO] MitID dialog closed without code');
+      return;
+    }
+    if (receivedState != state) {
+      widget.onAuthError?.call('Invalid state (possible CSRF).');
+      return;
+    }
+
+    final mobileService = CidaasMobileAuthService(
+      _dio,
+      const FlutterAppAuth(),
+      config,
+      _devAccount,
+    );
+    try {
+      final tokenResponse = await mobileService.signInWithCidaasCode(
+        _apiKey,
+        _envConfig.apiUrl,
+        receivedCode!,
+        codeVerifier,
+        clientId,
+        issuer,
+      );
+      if (tokenResponse.accessToken != null) {
+        widget.onAuthSuccess?.call(
+          accessToken: tokenResponse.accessToken,
+          refreshToken: tokenResponse.refreshToken,
+          idToken: tokenResponse.idToken,
+        );
+      } else {
+        widget.onAuthError?.call('Login failed, no access token.');
+      }
+    } on PlatformException catch (e) {
+      if (e.code == CidaasErrorHandler.userCancelledCode) return;
+      widget.onAuthError?.call(e.message ?? 'Authentication failed.');
+    } catch (e) {
+      widget.onAuthError?.call(e.toString());
+    }
   }
 
   /// Launches Cidaas login for mobile platforms.
