@@ -613,7 +613,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     }
     final authUrl = baseUri.replace(queryParameters: params);
     debugPrint(
-        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile): ${authUrl.origin}${authUrl.path}?...');
+        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile) generated: ${authUrl.toString()}');
 
     if (!mounted || !context.mounted) return;
     String? receivedCode;
