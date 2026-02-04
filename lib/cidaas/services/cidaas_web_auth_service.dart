@@ -29,6 +29,7 @@ class CidaasWebAuthService {
   }
 
   static const String _sessionStorageClientIdKey = 'cidaas_client_id_override';
+  static const String _sessionStorageIssuerOverrideKey = 'cidaas_issuer_override';
 
   /// Client ID to use for this flow. Reads override from sessionStorage if set
   /// (when user chose classic Cidaas or MitID); otherwise [config.effectiveClientId].
@@ -37,6 +38,13 @@ class CidaasWebAuthService {
     return (stored != null && stored.isNotEmpty)
         ? stored
         : config.effectiveClientId;
+  }
+
+  /// Issuer to use for token exchange. When MitID custom URL was used, we stored the issuer in session.
+  String _getIssuerForFlow() {
+    final stored = html.window.sessionStorage[_sessionStorageIssuerOverrideKey];
+    if (stored != null && stored.isNotEmpty) return stored;
+    return config.issuer;
   }
 
   /// Initiates the OAuth2 authorization flow for web.
@@ -70,6 +78,32 @@ class CidaasWebAuthService {
         : 'openid profile email';
 
     final redirectUri = returnUrl ?? config.redirectWebUri;
+
+    // MitID: use custom URL when configured (e.g. https://test-login.abena.com/authz-srv/authz?client_id=...&preferred_login=mitid)
+    final isMitIdFlow = config.cidaasClientIdMitID?.trim().isNotEmpty == true &&
+        clientId == config.cidaasClientIdMitID?.trim();
+    final customMitIdUrl = config.mitIdAuthUrl?.trim();
+
+    if (isMitIdFlow && customMitIdUrl != null && customMitIdUrl.isNotEmpty) {
+      final mitIdIssuer = config.mitIdEffectiveIssuer;
+      if (mitIdIssuer != null) {
+        html.window.sessionStorage[_sessionStorageIssuerOverrideKey] = mitIdIssuer;
+      }
+      final baseUri = Uri.parse(customMitIdUrl);
+      final params = Map<String, String>.from(baseUri.queryParameters)
+        ..['state'] = state
+        ..['code_challenge'] = codeChallenge
+        ..['code_challenge_method'] = 'S256';
+      if (!params.containsKey('scope') || params['scope']!.isEmpty) {
+        params['scope'] = scopes;
+      }
+      final authUrl = baseUri.replace(queryParameters: params);
+      debugPrint(
+          'CidaasWebAuthService: [DEBUG] MitID custom authUrl (redirect): ${authUrl.origin}${authUrl.path}?...');
+      debugPrint('CidaasWebAuthService: Redirecting to MitID login...');
+      html.window.location.href = authUrl.toString();
+      return;
+    }
 
     final authUrl = Uri.parse('${config.issuer}/authz-srv/authz').replace(
       queryParameters: {
@@ -180,7 +214,7 @@ class CidaasWebAuthService {
 
     // Check if popup was closed without completing auth
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      final isClosed = popup?.closed == true;
+      final isClosed = popup.closed;
       if (isClosed) {
         timer.cancel();
         html.window.removeEventListener('message', messageListener);
@@ -251,10 +285,11 @@ class CidaasWebAuthService {
     CidaasWebAuthResult authResult,
   ) async {
     final clientId = _getClientIdForFlow();
+    final issuer = _getIssuerForFlow();
     debugPrint(
-        'CidaasWebAuthService: [DEBUG] exchangeCodeForTokens clientId=$clientId tokenUrl=${config.issuer}/token-srv/token');
+        'CidaasWebAuthService: [DEBUG] exchangeCodeForTokens clientId=$clientId tokenUrl=$issuer/token-srv/token');
 
-    final tokenUrl = '${config.issuer}/token-srv/token';
+    final tokenUrl = '$issuer/token-srv/token';
 
     try {
       final response = await _dio.post(
@@ -314,8 +349,9 @@ class CidaasWebAuthService {
 
     // 3. Exchange Cidaas token for Ahamatic tokens
     final clientId = _getClientIdForFlow();
+    final issuer = _getIssuerForFlow();
     debugPrint(
-        'CidaasWebAuthService: [DEBUG] fetchTokens clientId=$clientId issuer=${config.issuer}');
+        'CidaasWebAuthService: [DEBUG] fetchTokens clientId=$clientId issuer=$issuer');
     final result = await _ahamaticService.fetchTokens(
       accessToken: tokenResponse.accessToken!,
       apiUrl: apiUrl,
@@ -323,10 +359,11 @@ class CidaasWebAuthService {
       ahamaticToken: ahamaticLoginToken,
       clientId: clientId,
       redirectUrl: config.redirectWebUri ?? config.redirectUri,
-      issuer: config.issuer,
+      issuer: issuer,
     );
 
     html.window.sessionStorage.remove(_sessionStorageClientIdKey);
+    html.window.sessionStorage.remove(_sessionStorageIssuerOverrideKey);
     debugPrint(
         'CidaasWebAuthService: [DEBUG] signInComplete done, sessionStorage[$_sessionStorageClientIdKey] cleared');
     return result;

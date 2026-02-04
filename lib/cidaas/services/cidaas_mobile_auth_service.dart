@@ -68,16 +68,40 @@ class CidaasMobileAuthService implements CidaasAuthApi {
     debugPrint(
         'CidaasMobileAuthService: [PROCESS] Using scopes: $cidaasScopes');
 
+    // MitID: use custom issuer when configured (e.g. https://test-login.abena.com)
+    final isMitIdFlow = config.cidaasClientIdMitID?.trim().isNotEmpty == true &&
+        effectiveClientId == config.cidaasClientIdMitID?.trim();
+    final mitIdIssuer = config.mitIdEffectiveIssuer;
+    final effectiveDiscoveryUrl = (isMitIdFlow && mitIdIssuer != null)
+        ? '$mitIdIssuer/.well-known/openid-configuration'
+        : config.discoveryUrl;
+    final effectiveIssuer = (isMitIdFlow && mitIdIssuer != null)
+        ? mitIdIssuer
+        : config.issuer;
+    if (isMitIdFlow && mitIdIssuer != null) {
+      debugPrint(
+          'CidaasMobileAuthService: [CONFIG] MitID flow using issuer=$effectiveIssuer discoveryUrl=$effectiveDiscoveryUrl');
+    }
+
     try {
       // 1. Authorization Request
       debugPrint(
           'CidaasMobileAuthService: [STEP 1/4] Building AuthorizationRequest (clientId: $effectiveClientId)...');
+      final authAdditionalParams = <String, String>{
+        'code_challenge_method': 'S256',
+      };
+      if (isMitIdFlow) {
+        authAdditionalParams['preferred_login'] = 'mitid';
+      }
       final AuthorizationRequest authRequest = AuthorizationRequest(
         effectiveClientId,
         config.redirectUri,
-        discoveryUrl: config.discoveryUrl,
+        discoveryUrl: effectiveDiscoveryUrl,
         scopes: cidaasScopes,
         nonce: null,
+        additionalParameters: authAdditionalParams.isNotEmpty
+            ? authAdditionalParams
+            : null,
       );
 
       debugPrint(
@@ -98,7 +122,7 @@ class CidaasMobileAuthService implements CidaasAuthApi {
       final TokenRequest tokenRequest = TokenRequest(
         effectiveClientId,
         config.redirectUri,
-        discoveryUrl: config.discoveryUrl,
+        discoveryUrl: effectiveDiscoveryUrl,
         scopes: config.scopes,
         authorizationCode: authResponse.authorizationCode,
         codeVerifier: authResponse.codeVerifier,
@@ -140,7 +164,7 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         ahamaticToken: ahamaticLoginResponse,
         clientId: effectiveClientId,
         redirectUrl: config.redirectUri,
-        issuer: config.issuer,
+        issuer: effectiveIssuer,
       );
 
       debugPrint(

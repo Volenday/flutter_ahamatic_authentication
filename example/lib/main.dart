@@ -197,8 +197,10 @@ final cidaasWebConfig = CidaasConfiguration(
   scopes: ['openid', 'profile', 'email', 'offline_access'],
   redirectWebUri: 'http://localhost:8080/callback',
   postLogoutWebUri: 'http://localhost:8080/',
-  // Set cidaasClientIdMitID to show the MitID button (use your MitID client ID)
-  // cidaasClientIdMitID: 'your-mitid-client-id',
+  // MitID: set client ID and optional custom auth URL for MitID login
+  cidaasClientIdMitID: '5fd6af67-1820-42f5-85fd-4dc236d00d65',
+  mitIdAuthUrl:
+      'https://test-login.abena.com/authz-srv/authz?client_id=5fd6af67-1820-42f5-85fd-4dc236d00d65&redirect_uri=https%3A%2F%2Fwww.bevilling.dk%2FLogin%2FCallback&response_type=code&preferred_login=mitid',
 );
 
 /// Gets the Cidaas configuration based on the platform
