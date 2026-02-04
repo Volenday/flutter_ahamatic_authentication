@@ -29,7 +29,8 @@ class CidaasWebAuthService {
   }
 
   static const String _sessionStorageClientIdKey = 'cidaas_client_id_override';
-  static const String _sessionStorageIssuerOverrideKey = 'cidaas_issuer_override';
+  static const String _sessionStorageIssuerOverrideKey =
+      'cidaas_issuer_override';
 
   /// Client ID to use for this flow. Reads override from sessionStorage if set
   /// (when user chose classic Cidaas or MitID); otherwise [config.effectiveClientId].
@@ -87,7 +88,8 @@ class CidaasWebAuthService {
     if (isMitIdFlow && customMitIdUrl != null && customMitIdUrl.isNotEmpty) {
       final mitIdIssuer = config.mitIdEffectiveIssuer;
       if (mitIdIssuer != null) {
-        html.window.sessionStorage[_sessionStorageIssuerOverrideKey] = mitIdIssuer;
+        html.window.sessionStorage[_sessionStorageIssuerOverrideKey] =
+            mitIdIssuer;
       }
       final baseUri = Uri.parse(customMitIdUrl);
       final params = Map<String, String>.from(baseUri.queryParameters)
@@ -214,7 +216,7 @@ class CidaasWebAuthService {
 
     // Check if popup was closed without completing auth
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      final isClosed = popup.closed;
+      final bool isClosed = popup?.closed ?? false;
       if (isClosed) {
         timer.cancel();
         html.window.removeEventListener('message', messageListener);
@@ -246,8 +248,7 @@ class CidaasWebAuthService {
         'CidaasWebAuthService: [DEBUG] callback code=${code != null ? "${code.length} chars" : "null"} state=${state != null ? "present" : "null"} error=$error storedClientId=${storedClientId ?? "(none)"}');
 
     if (error != null) {
-      debugPrint(
-          'CidaasWebAuthService: [ERROR] Auth error received: $error');
+      debugPrint('CidaasWebAuthService: [ERROR] Auth error received: $error');
       return null;
     }
 
@@ -333,8 +334,7 @@ class CidaasWebAuthService {
     String apiUrl,
     CidaasWebAuthResult authResult,
   ) async {
-    debugPrint(
-        'CidaasWebAuthService: [DEBUG] signInComplete apiUrl=$apiUrl');
+    debugPrint('CidaasWebAuthService: [DEBUG] signInComplete apiUrl=$apiUrl');
 
     // 1. Exchange code for Cidaas tokens
     final tokenResponse = await exchangeCodeForTokens(authResult);
