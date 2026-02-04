@@ -159,7 +159,8 @@ String _getDioErrorMessage(DioException error) {
 // CONFIGURATION
 // ============================================================================
 
-const environment = "sandbox";
+// Misma config que Bevilling (Reimbursment-App): production
+const environment = "production";
 String get apiURL {
   switch (environment) {
     case 'production':
@@ -432,12 +433,12 @@ class _LoginPageState extends State<LoginPage> {
                 child: _useCustomButtons
                     ? _buildCustomButtonsExample(context)
                     : FlutterAhaAuthentication(
-                        moduleName: 'abenaRestock',
-                        moduleWebName: 'abenaRestock',
+                        moduleName: 'Reimbursment-App',
+                        moduleWebName: 'Reimbursment-App',
                         projectLogoAsset: 'assets/images/sample_logo.png',
                         applicationCode: 'abenadata',
-                        environment: 'development',
-                        europe: true,
+                        environment: 'production',
+                        europe: false,
                         cidaasConfiguration: getCidaasConfig(),
                         onAuthSuccess: _onAuthSuccess,
                         onAuthError: _onAuthError,
@@ -463,11 +464,11 @@ class _LoginPageState extends State<LoginPage> {
           // Widget with controller: registers callbacks, renders nothing
           FlutterAhaAuthentication(
             controller: _authController,
-            moduleName: 'abenaRestock',
-            moduleWebName: 'abenaRestock',
+            moduleName: 'Reimbursment-App',
+            moduleWebName: 'Reimbursment-App',
             applicationCode: 'abenadata',
-            environment: 'development',
-            europe: true,
+            environment: 'production',
+            europe: false,
             cidaasConfiguration: getCidaasConfig(),
             onAuthSuccess: _onAuthSuccess,
             onAuthError: _onAuthError,
@@ -487,10 +488,11 @@ class _LoginPageState extends State<LoginPage> {
             style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
           const SizedBox(height: 20),
+          // Log ind som borger = MitID (igual que Bevilling; OpenIAM no está habilitado en este módulo)
           SizedBox(
             width: MediaQuery.of(context).size.width,
             child: ElevatedButton(
-              onPressed: () => _authController.launchOpenIamLogin(),
+              onPressed: () => _authController.launchMitIdLogin(),
               style: ElevatedButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: Colors.green,
@@ -509,6 +511,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           const SizedBox(height: 12),
+          // Log in as commune = Cidaas classic
           SizedBox(
             width: MediaQuery.of(context).size.width,
             child: OutlinedButton(
@@ -636,7 +639,7 @@ class _CallbackPageState extends State<CallbackPage>
           AhamaticApiServiceImpl(dio: dio, apiUrl: apiURL);
       final moduleConfig = await ahamaticApiService.getModuleConfig(
         'abenadata',
-        'abenaRestock',
+        'Reimbursment-App',
       );
       final apiKey = moduleConfig.apiKey ?? '';
       debugPrint(
@@ -651,7 +654,7 @@ class _CallbackPageState extends State<CallbackPage>
             '╠══════════════════════════════════════════════════════════════');
         debugPrint(
             '║ Could not retrieve the apiKey from module configuration.');
-        debugPrint('║ Module: abenadata / abenaRestock');
+        debugPrint('║ Module: abenadata / Reimbursment-App');
         debugPrint('║ Please verify that the module is properly configured.');
         debugPrint(
             '╚══════════════════════════════════════════════════════════════');
