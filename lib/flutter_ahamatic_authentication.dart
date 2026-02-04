@@ -607,13 +607,14 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       ..['state'] = state
       ..['code_challenge'] = codeChallenge
       ..['code_challenge_method'] = 'S256'
-      ..['redirect_uri'] = config.redirectUri;
+      ..['redirect_uri'] = config.redirectUri
+      ..['prompt'] = 'login';
     if (!params.containsKey('scope') || params['scope']!.isEmpty) {
       params['scope'] = scopes;
     }
     final authUrl = baseUri.replace(queryParameters: params);
     debugPrint(
-        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile) generated: ${authUrl.toString()}');
+        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile) platform=${PlatformService.platformName} url=$authUrl');
 
     if (!mounted || !context.mounted) return;
     String? receivedCode;
