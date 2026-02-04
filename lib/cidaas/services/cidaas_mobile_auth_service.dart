@@ -85,23 +85,20 @@ class CidaasMobileAuthService implements CidaasAuthApi {
 
     try {
       // 1. Authorization Request
+      // Do NOT pass code_challenge_method in additionalParameters - AppAuth (Android) rejects it;
+      // PKCE is handled by the library via the builder.
       debugPrint(
           'CidaasMobileAuthService: [STEP 1/4] Building AuthorizationRequest (clientId: $effectiveClientId)...');
-      final authAdditionalParams = <String, String>{
-        'code_challenge_method': 'S256',
-      };
-      if (isMitIdFlow) {
-        authAdditionalParams['preferred_login'] = 'mitid';
-      }
+      final Map<String, String>? authAdditionalParams = isMitIdFlow
+          ? {'preferred_login': 'mitid'}
+          : null;
       final AuthorizationRequest authRequest = AuthorizationRequest(
         effectiveClientId,
         config.redirectUri,
         discoveryUrl: effectiveDiscoveryUrl,
         scopes: cidaasScopes,
         nonce: null,
-        additionalParameters: authAdditionalParams.isNotEmpty
-            ? authAdditionalParams
-            : null,
+        additionalParameters: authAdditionalParams,
       );
 
       debugPrint(
@@ -128,9 +125,6 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         codeVerifier: authResponse.codeVerifier,
         nonce: authResponse.nonce,
         allowInsecureConnections: true,
-        additionalParameters: {
-          'code_challenge_method': 'S256',
-        },
       );
 
       debugPrint(
