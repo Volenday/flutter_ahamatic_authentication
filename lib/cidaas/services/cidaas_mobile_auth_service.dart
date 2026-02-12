@@ -33,33 +33,48 @@ class CidaasMobileAuthService implements CidaasAuthApi {
     String apiKey,
     String? apiUrl,
   ) async {
-    debugPrint('CidaasMobileAuthService: Starting sign-in process...');
+    debugPrint('CidaasMobileAuthService: ═══ Starting sign-in process ═══');
+
+    // Log all input values for debugging
+    debugPrint('CidaasMobileAuthService: [INPUT] apiKey: ${apiKey.isEmpty ? "(empty)" : "${apiKey.substring(0, apiKey.length > 8 ? 8 : apiKey.length)}..."}');
+    debugPrint('CidaasMobileAuthService: [INPUT] apiUrl: $apiUrl');
+    debugPrint('CidaasMobileAuthService: [CONFIG] clientId: ${config.clientId}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] cidaasClientIdMitID: ${config.cidaasClientIdMitID ?? "(null)"}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] effectiveClientId: ${config.effectiveClientId}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] issuer: ${config.issuer}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] redirectUri: ${config.redirectUri}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] discoveryUrl: ${config.discoveryUrl}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] scopes: ${config.scopes}');
+    debugPrint('CidaasMobileAuthService: [CONFIG] postLogoutRedirectUri: ${config.postLogoutRedirectUri}');
 
     final List<String> cidaasScopes = config.scopes.isNotEmpty
         ? config.scopes
         : ['openid', 'profile', 'email'];
+    debugPrint('CidaasMobileAuthService: [PROCESS] Using scopes: $cidaasScopes');
 
     try {
       // 1. Authorization Request
+      debugPrint('CidaasMobileAuthService: [STEP 1/4] Building AuthorizationRequest...');
       final AuthorizationRequest authRequest = AuthorizationRequest(
-        config.clientId,
+        config.effectiveClientId,
         config.redirectUri,
         discoveryUrl: config.discoveryUrl,
         scopes: cidaasScopes,
         nonce: null,
       );
 
-      debugPrint('CidaasMobileAuthService: Sending authorization request...');
+      debugPrint('CidaasMobileAuthService: [STEP 1/4] Sending authorization request (clientId: ${config.effectiveClientId})...');
 
       final AuthorizationResponse authResponse = await _appAuth.authorize(
         authRequest,
       );
 
-      debugPrint('CidaasMobileAuthService: Authorization successful');
+      debugPrint('CidaasMobileAuthService: [STEP 1/4] Authorization successful (code received: ${authResponse.authorizationCode != null})');
 
       // 2. Token Exchange Request
+      debugPrint('CidaasMobileAuthService: [STEP 2/4] Building TokenRequest...');
       final TokenRequest tokenRequest = TokenRequest(
-        config.clientId,
+        config.effectiveClientId,
         config.redirectUri,
         discoveryUrl: config.discoveryUrl,
         scopes: config.scopes,
@@ -72,34 +87,35 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         },
       );
 
-      debugPrint('CidaasMobileAuthService: Exchanging authorization code...');
+      debugPrint('CidaasMobileAuthService: [STEP 2/4] Exchanging authorization code for tokens...');
 
       final TokenResponse tokenResponse = await _appAuth.token(tokenRequest);
 
-      debugPrint('CidaasMobileAuthService: Token exchange successful');
+      debugPrint('CidaasMobileAuthService: [STEP 2/4] Token exchange successful (accessToken: ${tokenResponse.accessToken != null})');
 
       // 3. Login to Ahamatic
-      debugPrint('CidaasMobileAuthService: Logging in to Ahamatic...');
+      debugPrint('CidaasMobileAuthService: [STEP 3/4] Logging in to Ahamatic (apiUrl: $apiUrl)...');
       final ahamaticLoginResponse = await _ahamaticService.loginEmail(
         apiKey,
         apiUrl!,
       );
 
-      debugPrint('CidaasMobileAuthService: Ahamatic login successful');
+      debugPrint('CidaasMobileAuthService: [STEP 3/4] Ahamatic login successful (token length: ${ahamaticLoginResponse.length})');
 
       // 4. Exchange tokens with Ahamatic
-      debugPrint('CidaasMobileAuthService: Fetching Ahamatic tokens...');
+      debugPrint('CidaasMobileAuthService: [STEP 4/4] Fetching Ahamatic tokens (clientId: ${config.effectiveClientId}, issuer: ${config.issuer})...');
       final ahamaticResponse = await _ahamaticService.fetchTokens(
         accessToken: tokenResponse.accessToken!,
         apiUrl: apiUrl,
         apiKey: apiKey,
         ahamaticToken: ahamaticLoginResponse,
-        clientId: config.clientId,
+        clientId: config.effectiveClientId,
         redirectUrl: config.redirectUri,
         issuer: config.issuer,
       );
 
-      debugPrint('CidaasMobileAuthService: Sign-in completed successfully');
+      debugPrint('CidaasMobileAuthService: [STEP 4/4] Ahamatic tokens received successfully');
+      debugPrint('CidaasMobileAuthService: ═══ Sign-in completed successfully ═══');
 
       return TokenResponse(
         ahamaticResponse.accessToken,
@@ -111,6 +127,7 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         null, // tokenAdditionalParameters
       );
     } on PlatformException catch (e, stack) {
+      debugPrint('CidaasMobileAuthService: [ERROR] PlatformException code=${e.code} message=${e.message}');
       CidaasErrorHandler.logError(
         e,
         stack,
@@ -136,6 +153,7 @@ class CidaasMobileAuthService implements CidaasAuthApi {
         stacktrace: stack.toString(),
       );
     } catch (e, stack) {
+      debugPrint('CidaasMobileAuthService: [ERROR] Unexpected error: $e');
       CidaasErrorHandler.logError(
         e,
         stack,
@@ -155,7 +173,9 @@ class CidaasMobileAuthService implements CidaasAuthApi {
 
   @override
   Future<void> signOut(String? idToken) async {
-    debugPrint('CidaasMobileAuthService: Starting sign-out process...');
+    debugPrint('CidaasMobileAuthService: ═══ Starting sign-out process ═══');
+    debugPrint('CidaasMobileAuthService: [CONFIG] postLogoutRedirectUri: ${config.postLogoutRedirectUri} discoveryUrl: ${config.discoveryUrl}');
+    debugPrint('CidaasMobileAuthService: [INPUT] idToken: ${idToken != null ? "${idToken.length} chars" : "(null)"}');
 
     try {
       final EndSessionRequest endSessionRequest = EndSessionRequest(

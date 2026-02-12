@@ -151,7 +151,7 @@ class CidaasWebAuthService {
 
     // Check if popup was closed without completing auth
     Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      final isClosed = popup?.closed == true;
+      final bool isClosed = popup?.closed ?? false;
       if (isClosed) {
         timer.cancel();
         html.window.removeEventListener('message', messageListener);
