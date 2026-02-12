@@ -23,9 +23,16 @@ void main() {
       );
     });
 
+    test('launchMitIdLogin does nothing when callbacks not set', () {
+      expect(
+        () => controller.launchMitIdLogin(),
+        returnsNormally,
+      );
+    });
+
     test('setLaunchCallbacks stores OpenIAM callback', () {
       var openIamCalled = false;
-      controller.setLaunchCallbacks(() => openIamCalled = true, null);
+      controller.setLaunchCallbacks(() => openIamCalled = true);
 
       controller.launchOpenIamLogin();
 
@@ -36,7 +43,7 @@ void main() {
       var cidaasCalled = false;
       controller.setLaunchCallbacks(
         () {},
-        () => cidaasCalled = true,
+        cidaasLogin: () => cidaasCalled = true,
       );
 
       controller.launchCidaasLogin();
@@ -44,11 +51,32 @@ void main() {
       expect(cidaasCalled, isTrue);
     });
 
+    test('setLaunchCallbacks stores MitID callback when provided', () {
+      var mitIdCalled = false;
+      controller.setLaunchCallbacks(
+        () {},
+        mitIdLogin: () => mitIdCalled = true,
+      );
+
+      controller.launchMitIdLogin();
+
+      expect(mitIdCalled, isTrue);
+    });
+
     test('launchCidaasLogin does nothing when Cidaas callback was null', () {
       var openIamCalled = false;
-      controller.setLaunchCallbacks(() => openIamCalled = true, null);
+      controller.setLaunchCallbacks(() => openIamCalled = true);
 
       controller.launchCidaasLogin();
+
+      expect(openIamCalled, isFalse);
+    });
+
+    test('launchMitIdLogin does nothing when MitID callback was null', () {
+      var openIamCalled = false;
+      controller.setLaunchCallbacks(() => openIamCalled = true);
+
+      controller.launchMitIdLogin();
 
       expect(openIamCalled, isFalse);
     });
@@ -58,7 +86,7 @@ void main() {
       var cidaasCount = 0;
       controller.setLaunchCallbacks(
         () => openIamCount++,
-        () => cidaasCount++,
+        cidaasLogin: () => cidaasCount++,
       );
 
       controller.launchOpenIamLogin();
@@ -72,8 +100,8 @@ void main() {
     test('setLaunchCallbacks overwrites previous callbacks', () {
       var firstCalled = false;
       var secondCalled = false;
-      controller.setLaunchCallbacks(() => firstCalled = true, null);
-      controller.setLaunchCallbacks(() => secondCalled = true, null);
+      controller.setLaunchCallbacks(() => firstCalled = true);
+      controller.setLaunchCallbacks(() => secondCalled = true);
 
       controller.launchOpenIamLogin();
 

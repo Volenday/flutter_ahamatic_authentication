@@ -9,6 +9,9 @@ import 'package:flutter/services.dart';
 /// - Generate user-friendly error messages
 /// - Handle DioException and PlatformException specifically
 class CidaasErrorHandler {
+  /// Error code used when the user manually cancels the authentication flow.
+  /// This should NOT trigger error callbacks - it's a normal user action.
+  static const String userCancelledCode = 'user_cancelled';
   /// Logs detailed error information to the console.
   ///
   /// [error] - The error object

@@ -34,6 +34,11 @@ class AhamaticTokenService {
     }
 
     try {
+      debugPrint(
+        'AhamaticTokenService: [REQUEST] POST $apiUrl/api/auth/email '
+        'with apiKey=${apiKey.isNotEmpty ? "${apiKey.substring(0, apiKey.length > 6 ? 6 : apiKey.length)}..." : "(empty)"} '
+        'and email=${devAccount['emailAddress']}',
+      );
       final response = await _dio.post(
         '$apiUrl/api/auth/email',
         data: {

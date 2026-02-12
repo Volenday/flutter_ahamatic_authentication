@@ -9,13 +9,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_entity.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_api.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/utils/error_handler.dart';
 import 'package:flutter_ahamatic_authentication/models/app_config.dart';
 import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
 import 'package:flutter_ahamatic_authentication/services/openiam_auth_service.dart';
 import 'package:flutter_ahamatic_authentication/services/auth_logging_service.dart';
 import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 import 'package:flutter_ahamatic_authentication/widgets/auth_webview.dart';
+import 'package:flutter_ahamatic_authentication/cidaas/utils/pkce_utils.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -68,13 +71,18 @@ enum LoginType { azure, mitId, openIAM, cidaas }
 class AhamaticAuthController {
   VoidCallback? _onOpenIamLogin;
   VoidCallback? _onCidaasLogin;
+  VoidCallback? _onMitIdLogin;
 
   /// Called by [FlutterAhaAuthentication] to register the login actions.
   /// Do not call this directly.
   void setLaunchCallbacks(
-      VoidCallback openIamLogin, VoidCallback? cidaasLogin) {
+    VoidCallback openIamLogin, {
+    VoidCallback? cidaasLogin,
+    VoidCallback? mitIdLogin,
+  }) {
     _onOpenIamLogin = openIamLogin;
     _onCidaasLogin = cidaasLogin;
+    _onMitIdLogin = mitIdLogin;
   }
 
   /// Launches the OpenIAM (e.g. "Log in as citizen") login flow.
@@ -87,6 +95,12 @@ class AhamaticAuthController {
   /// No-op if Cidaas is not enabled or callbacks are not registered.
   void launchCidaasLogin() {
     _onCidaasLogin?.call();
+  }
+
+  /// Launches the MitID login flow (Cidaas with [CidaasConfiguration.cidaasClientIdMitID]).
+  /// No-op if MitID is not configured or callbacks are not registered.
+  void launchMitIdLogin() {
+    _onMitIdLogin?.call();
   }
 }
 
@@ -278,6 +292,16 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
 
   /// Loads initial application data
   Future<void> _loadInitialData() async {
+    debugPrint(
+      'FlutterAhaAuthentication: [INIT] environment=${widget.environment}, '
+      'europe=${widget.europe}, '
+      'applicationCode=${widget.applicationCode}, '
+      'moduleName=${widget.moduleName}, '
+      'moduleWebName=${widget.moduleWebName}, '
+      'apiUrl=${_envConfig.apiUrl}, '
+      'portalUrl=${_envConfig.portalUrl}, '
+      'initialApiKey=$_apiKey',
+    );
     await _fetchModuleConfig();
     await _fetchLoginUrl();
   }
@@ -307,7 +331,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       }
 
       debugPrint(
-          'Module config loaded: Cidaas=$_isCidaasEnabled, OpenIAM=$_isOpeniamEnabled');
+        'FlutterAhaAuthentication: [MODULE_CONFIG] '
+        'projectName=$_projectName, '
+        'apiKey=$_apiKey, '
+        'cidaasEnabled=$_isCidaasEnabled, '
+        'openIamEnabled=$_isOpeniamEnabled, '
+        'hostName=$_hostName',
+      );
     } on AhamaticApiException catch (e) {
       debugPrint('Error fetching module config: $e');
     }
@@ -353,6 +383,8 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   ///
   /// This method handles both web and mobile platforms automatically.
   Future<void> _launchOpenIamLogin(BuildContext context) async {
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] _launchOpenIamLogin applicationCode=${widget.applicationCode} moduleName=${widget.moduleName}');
     // Update hostName if not available
     if (_hostName == null && widget.moduleName != null) {
       try {
@@ -382,13 +414,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     );
 
     if (loginUrl == null) {
-      debugPrint('Could not generate login URL');
+      debugPrint(
+          'FlutterAhaAuthentication: [ERROR] OpenIAM could not generate login URL');
       widget.onAuthError?.call('Could not generate login URL');
       return;
     }
 
     _openiamLoginUrl = loginUrl;
-    debugPrint('OpenIAM Login URL: $loginUrl');
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] OpenIAM loginUrl (length ${loginUrl.length}) externalBrowser=${widget.externalBrowserLogin} platform=${PlatformService.isWeb ? "web" : "mobile"}');
 
     // Handle external browser login
     if (widget.externalBrowserLogin == true) {
@@ -421,72 +455,273 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           widget.onAuthError?.call(error);
         },
         onClose: () {
-          debugPrint('Auth dialog closed by user');
+          // User manually closed the dialog - this is not an error, just log it
+          debugPrint('FlutterAhaAuthentication: [INFO] Auth dialog closed by user (manual cancellation)');
+          // Note: We don't call onAuthError here because closing the dialog is a normal user action
         },
       );
     }
   }
 
-  /// Launches the Cidaas login flow
-  ///
-  /// On mobile, uses flutter_appauth for native OAuth2 flow.
-  /// On web, uses standard OAuth2 with redirect/popup.
+  /// Launches the classic Cidaas login flow (uses [CidaasConfiguration.clientId]).
   Future<void> _launchCidaasLogin() async {
+    debugPrint('FlutterAhaAuthentication: [DEBUG] _launchCidaasLogin (classic)');
     final config = widget.cidaasConfiguration;
-
     if (config == null) {
-      debugPrint('Error: CidaasConfiguration not provided');
+      debugPrint('FlutterAhaAuthentication: [ERROR] CidaasConfiguration not provided');
       widget.onAuthError?.call('Cidaas configuration not provided.');
       return;
     }
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] classic clientId: ${config.clientId}');
+    await _launchCidaasLoginWithClientId(config.clientId);
+  }
+
+  /// Launches the MitID login flow (uses [CidaasConfiguration.cidaasClientIdMitID]).
+  /// No-op if [cidaasClientIdMitID] is null or empty.
+  Future<void> _launchMitIdLogin() async {
+    debugPrint('FlutterAhaAuthentication: [DEBUG] _launchMitIdLogin (MitID)');
+    final config = widget.cidaasConfiguration;
+    if (config == null) {
+      debugPrint('FlutterAhaAuthentication: [ERROR] CidaasConfiguration not provided');
+      widget.onAuthError?.call('Cidaas configuration not provided.');
+      return;
+    }
+    final mitIdClientId = config.cidaasClientIdMitID?.trim();
+    if (mitIdClientId == null || mitIdClientId.isEmpty) {
+      debugPrint(
+          'FlutterAhaAuthentication: [ERROR] cidaasClientIdMitID not set');
+      widget.onAuthError?.call('MitID is not configured.');
+      return;
+    }
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] MitID clientId: $mitIdClientId');
+    await _launchCidaasLoginWithClientId(mitIdClientId);
+  }
+
+  /// Launches the Cidaas login flow with the given [clientId] (classic or MitID).
+  Future<void> _launchCidaasLoginWithClientId(String clientId) async {
+    final config = widget.cidaasConfiguration;
+    if (config == null) {
+      return;
+    }
+
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] _launchCidaasLoginWithClientId clientId=$clientId platform=${PlatformService.isWeb ? "web" : "mobile"}');
 
     // iOS workaround: Mark first attempt immediately when user taps the button
-    // This ensures the button changes to "Continue" when user returns from browser
     final isFirstIOSAttempt = PlatformService.isIOS && !_cidaasFirstAttemptDone;
     if (isFirstIOSAttempt) {
-      debugPrint('iOS: Marking first Cidaas attempt...');
+      debugPrint('FlutterAhaAuthentication: [DEBUG] iOS first attempt');
       _cidaasFirstAttemptDone = true;
       if (mounted) {
         setState(() {});
-        // Small delay to ensure UI updates before opening browser
         await Future.delayed(const Duration(milliseconds: 100));
       }
     }
 
     try {
       if (PlatformService.isWeb) {
-        // Web: Use OAuth2 redirect flow
-        await _launchCidaasLoginWeb(config);
+        debugPrint(
+            'FlutterAhaAuthentication: [DEBUG] starting Cidaas web flow');
+        await _launchCidaasLoginWeb(config, clientId);
       } else {
-        // Mobile: Use flutter_appauth
-        await _launchCidaasLoginMobile(config);
+        final isMitIdFlow = config.cidaasClientIdMitID?.trim().isNotEmpty == true &&
+            clientId == config.cidaasClientIdMitID?.trim();
+        final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
+        if (isMitIdFlow && mitIdAuthUrl != null && mitIdAuthUrl.isNotEmpty) {
+          debugPrint(
+              'FlutterAhaAuthentication: [DEBUG] starting MitID mobile flow (full URL)');
+          await _launchMitIdLoginMobileWithFullUrl(config, clientId);
+        } else {
+          debugPrint(
+              'FlutterAhaAuthentication: [DEBUG] starting Cidaas mobile flow');
+          await _launchCidaasLoginMobile(config, clientId);
+        }
       }
     } on PlatformException catch (e) {
-      debugPrint('Cidaas PlatformException: ${e.message}');
+      // Check if this is a user cancellation (manual action, not an error)
+      if (e.code == CidaasErrorHandler.userCancelledCode) {
+        debugPrint(
+            'FlutterAhaAuthentication: [INFO] User manually cancelled authentication');
+        // Don't call onAuthError for manual cancellations - it's a normal user action
+        return;
+      }
+
+      // Real error - log and notify
+      debugPrint(
+          'FlutterAhaAuthentication: [ERROR] Cidaas PlatformException: ${e.code} ${e.message}');
       widget.onAuthError
           ?.call(e.message ?? 'An unknown platform error occurred.');
-    } catch (e) {
-      debugPrint('Cidaas unexpected error: $e');
-      widget.onAuthError?.call('An unexpected error occurred: $e');
+    } catch (e, stack) {
+      // Unexpected error - provide better error message
+      debugPrint(
+          'FlutterAhaAuthentication: [ERROR] Cidaas unexpected error: $e');
+      debugPrint('FlutterAhaAuthentication: [ERROR] Stack trace: $stack');
+      
+      final errorMessage = e is DioException
+          ? CidaasErrorHandler.getUserFriendlyMessage(e)
+          : 'An unexpected error occurred during authentication. Please try again.';
+      
+      widget.onAuthError?.call(errorMessage);
     }
   }
 
-  /// Launches Cidaas login for web platform
-  Future<void> _launchCidaasLoginWeb(CidaasConfiguration config) async {
-    debugPrint('Launching Cidaas login for web');
+  /// Launches Cidaas login for web platform.
+  /// [clientIdOverride] is the client ID to use (classic [config.clientId] or MitID [config.cidaasClientIdMitID]).
+  Future<void> _launchCidaasLoginWeb(
+      CidaasConfiguration config, String clientIdOverride) async {
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] _launchCidaasLoginWeb clientId=$clientIdOverride issuer=${config.issuer} redirectWebUri=${config.redirectWebUri}');
 
     final cidaasWebAuth = CidaasWebAuth(_dio, config, _devAccount);
-
-    // Initiate the OAuth2 flow - this will redirect the browser
-    cidaasWebAuth.initiateAuthFlow();
+    cidaasWebAuth.initiateAuthFlow(clientIdOverride: clientIdOverride);
 
     // Note: The flow continues when the user returns to the callback URL.
-    // The callback handling should be done in initState or a dedicated callback page.
   }
 
-  /// Launches Cidaas login for mobile platforms
-  Future<void> _launchCidaasLoginMobile(CidaasConfiguration config) async {
-    debugPrint('Launching Cidaas login for mobile');
+  /// Launches MitID login on mobile using the full [mitIdAuthUrl].
+  /// Opens the URL in a WebView with PKCE and app redirect_uri; intercepts
+  /// the callback and exchanges the code for tokens.
+  Future<void> _launchMitIdLoginMobileWithFullUrl(
+      CidaasConfiguration config, String clientId) async {
+    final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
+    final issuer = config.mitIdEffectiveIssuer;
+    if (mitIdAuthUrl == null ||
+        mitIdAuthUrl.isEmpty ||
+        issuer == null ||
+        issuer.isEmpty) {
+      widget.onAuthError?.call('MitID URL or issuer not configured.');
+      return;
+    }
+
+    final codeVerifier = PkceUtils.generateCodeVerifier();
+    final codeChallenge = PkceUtils.generateCodeChallenge(codeVerifier);
+    final state = PkceUtils.generateState();
+    final scopes = config.scopes.isNotEmpty
+        ? config.scopes.join(' ')
+        : 'openid profile email';
+
+    final baseUri = Uri.parse(mitIdAuthUrl);
+    final params = Map<String, String>.from(baseUri.queryParameters)
+      ..['state'] = state
+      ..['code_challenge'] = codeChallenge
+      ..['code_challenge_method'] = 'S256'
+      ..['redirect_uri'] = config.redirectUri
+      ..['prompt'] = 'login';
+    if (!params.containsKey('scope') || params['scope']!.isEmpty) {
+      params['scope'] = scopes;
+    }
+    final authUrl = baseUri.replace(queryParameters: params);
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] MitID full URL (mobile) platform=${PlatformService.platformName} url=$authUrl');
+
+    if (!mounted || !context.mounted) return;
+    String? receivedCode;
+    String? receivedState;
+    final navigator = Navigator.of(context);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: MediaQuery.of(dialogContext).size.width * 0.9,
+            height: MediaQuery.of(dialogContext).size.height * 0.85,
+            child: Column(
+              children: [
+                AppBar(
+                  title: const Text('MitID Login'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => navigator.pop(),
+                  ),
+                ),
+                Expanded(
+                  child: WebViewWidget(
+                    controller: WebViewController()
+                      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                      ..setNavigationDelegate(
+                        NavigationDelegate(
+                          onNavigationRequest: (request) {
+                            final uri = Uri.parse(request.url);
+                            if (uri.toString().startsWith(config.redirectUri) &&
+                                uri.queryParameters.containsKey('code') &&
+                                uri.queryParameters.containsKey('state')) {
+                              receivedCode = uri.queryParameters['code'];
+                              receivedState = uri.queryParameters['state'];
+                              navigator.pop();
+                              return NavigationDecision.prevent;
+                            }
+                            if (uri.queryParameters.containsKey('error')) {
+                              navigator.pop();
+                              return NavigationDecision.prevent;
+                            }
+                            return NavigationDecision.navigate;
+                          },
+                        ),
+                      )
+                      ..loadRequest(authUrl),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (receivedCode == null || receivedState == null) {
+      debugPrint(
+          'FlutterAhaAuthentication: [INFO] MitID dialog closed without code');
+      return;
+    }
+    if (receivedState != state) {
+      widget.onAuthError?.call('Invalid state (possible CSRF).');
+      return;
+    }
+
+    final mobileService = CidaasMobileAuthService(
+      _dio,
+      const FlutterAppAuth(),
+      config,
+      _devAccount,
+    );
+    try {
+      final tokenResponse = await mobileService.signInWithCidaasCode(
+        _apiKey,
+        _envConfig.apiUrl,
+        receivedCode!,
+        codeVerifier,
+        clientId,
+        issuer,
+      );
+      if (tokenResponse.accessToken != null) {
+        widget.onAuthSuccess?.call(
+          accessToken: tokenResponse.accessToken,
+          refreshToken: tokenResponse.refreshToken,
+          idToken: tokenResponse.idToken,
+        );
+      } else {
+        widget.onAuthError?.call('Login failed, no access token.');
+      }
+    } on PlatformException catch (e) {
+      if (e.code == CidaasErrorHandler.userCancelledCode) return;
+      widget.onAuthError?.call(e.message ?? 'Authentication failed.');
+    } catch (e) {
+      widget.onAuthError?.call(e.toString());
+    }
+  }
+
+  /// Launches Cidaas login for mobile platforms.
+  /// [clientIdOverride] is the client ID to use (classic or MitID).
+  Future<void> _launchCidaasLoginMobile(
+      CidaasConfiguration config, String clientIdOverride) async {
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] _launchCidaasLoginMobile clientId=$clientIdOverride apiUrl=${_envConfig.apiUrl}');
 
     final cidaasAuthApi = CidaasAuthApiImpl(
       _dio,
@@ -498,17 +733,20 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     final tokenResponse = await cidaasAuthApi.signInWithCidaas(
       _apiKey,
       _envConfig.apiUrl,
+      clientIdOverride: clientIdOverride,
     );
 
     if (tokenResponse.accessToken != null) {
-      debugPrint('Cidaas login successful');
+      debugPrint(
+          'FlutterAhaAuthentication: [DEBUG] Cidaas login success (accessToken: ${tokenResponse.accessToken!.length} chars)');
       widget.onAuthSuccess?.call(
         accessToken: tokenResponse.accessToken,
         refreshToken: tokenResponse.refreshToken,
         idToken: tokenResponse.idToken,
       );
     } else {
-      debugPrint('Cidaas login failed: no access token');
+      debugPrint(
+          'FlutterAhaAuthentication: [ERROR] Cidaas login failed: no access token');
       widget.onAuthError?.call('Login failed, no access token.');
     }
   }
@@ -516,9 +754,15 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
   @override
   Widget build(BuildContext context) {
     if (widget.controller != null) {
+      final config = widget.cidaasConfiguration;
+      final hasMitId = config != null &&
+          (config.cidaasClientIdMitID?.trim().isNotEmpty ?? false);
+      debugPrint(
+          'FlutterAhaAuthentication: [DEBUG] build with controller cidaasEnabled=$_isCidaasEnabled hasMitId=$hasMitId');
       widget.controller!.setLaunchCallbacks(
         () => _launchOpenIamLogin(context),
-        _isCidaasEnabled ? () => _launchCidaasLogin() : null,
+        cidaasLogin: _isCidaasEnabled ? () => _launchCidaasLogin() : null,
+        mitIdLogin: _isCidaasEnabled && hasMitId ? () => _launchMitIdLogin() : null,
       );
       return const SizedBox.shrink();
     }
@@ -625,6 +869,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         : 'Cidaas';
     debugPrint('🔘 Button name: $cidaasButtonName');
 
+    final config = widget.cidaasConfiguration;
+    final hasMitId = config != null &&
+        (config.cidaasClientIdMitID?.trim().isNotEmpty ?? false);
+    debugPrint(
+        'FlutterAhaAuthentication: [DEBUG] _buildAuthButtons cidaas=$_isCidaasEnabled openiam=$_isOpeniamEnabled hasMitId=$hasMitId');
+
     return Wrap(
       alignment: WrapAlignment.center,
       spacing: 20,
@@ -638,6 +888,13 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
             onPressed: _launchCidaasLogin,
             // Show highlight effect after first attempt on iOS
             highlighted: PlatformService.isIOS && _cidaasFirstAttemptDone,
+          ),
+        if (_isCidaasEnabled && hasMitId)
+          _SignInAlternatives(
+            name: 'MitID',
+            logo: _cidaasLogoAsset,
+            isAsset: true,
+            onPressed: _launchMitIdLogin,
           ),
         if (_isOpeniamEnabled)
           _SignInAlternatives(

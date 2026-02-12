@@ -18,13 +18,14 @@ class CidaasWebAuthService {
     );
   }
 
-  void initiateAuthFlow({String? returnUrl}) {
+  void initiateAuthFlow({String? returnUrl, String? clientIdOverride}) {
     throw UnsupportedError(
       'CidaasWebAuthService is only available on web platforms',
     );
   }
 
-  Future<CidaasWebAuthResult?> initiateAuthFlowPopup({String? returnUrl}) {
+  Future<CidaasWebAuthResult?> initiateAuthFlowPopup(
+      {String? returnUrl, String? clientIdOverride}) {
     throw UnsupportedError(
       'CidaasWebAuthService is only available on web platforms',
     );

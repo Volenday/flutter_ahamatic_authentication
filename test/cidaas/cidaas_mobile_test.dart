@@ -242,4 +242,77 @@ void main() {
       expect(CidaasMobileAuthService, isNotNull);
     });
   });
+
+  group('MitID flow and configuration', () {
+    test('should derive mitIdEffectiveIssuer from mitIdAuthUrl when mitIdIssuer is null',
+        () {
+      final config = CidaasConfiguration(
+        clientId: 'classic-client-id',
+        issuer: 'https://issuer.cidaas.eu/',
+        redirectUri: 'app://test/callback',
+        postLogoutRedirectUri: 'app://test/logout',
+        discoveryUrl:
+            'https://issuer.cidaas.eu/.well-known/openid-configuration',
+        scopes: ['openid'],
+        cidaasClientIdMitID: '5fd6af67-1820-42f5-85fd-4dc236d00d65',
+        mitIdAuthUrl:
+            'https://test-login.abena.com/authz-srv/authz?client_id=5fd6af67-1820-42f5-85fd-4dc236d00d65&redirect_uri=https%3A%2F%2Fwww.bevilling.dk%2FLogin%2FCallback&response_type=code&preferred_login=mitid',
+      );
+
+      expect(config.mitIdEffectiveIssuer, equals('https://test-login.abena.com'));
+      expect(config.useMitIdCustomUrl, isTrue);
+    });
+
+    test('should prefer mitIdIssuer over mitIdAuthUrl origin when both set', () {
+      final config = CidaasConfiguration(
+        clientId: 'classic-client-id',
+        issuer: 'https://issuer.cidaas.eu/',
+        redirectUri: 'app://test/callback',
+        postLogoutRedirectUri: 'app://test/logout',
+        discoveryUrl:
+            'https://issuer.cidaas.eu/.well-known/openid-configuration',
+        scopes: ['openid'],
+        cidaasClientIdMitID: 'mitid-client-id',
+        mitIdAuthUrl:
+            'https://other.example.com/authz-srv/authz?client_id=mitid-client-id',
+        mitIdIssuer: 'https://test-login.abena.com',
+      );
+
+      expect(config.mitIdEffectiveIssuer, equals('https://test-login.abena.com'));
+    });
+
+    test('should have useMitIdCustomUrl true when only mitIdIssuer is set', () {
+      final config = CidaasConfiguration(
+        clientId: 'classic-client-id',
+        issuer: 'https://issuer.cidaas.eu/',
+        redirectUri: 'app://test/callback',
+        postLogoutRedirectUri: 'app://test/logout',
+        discoveryUrl:
+            'https://issuer.cidaas.eu/.well-known/openid-configuration',
+        scopes: ['openid'],
+        cidaasClientIdMitID: 'mitid-client-id',
+        mitIdIssuer: 'https://test-login.abena.com',
+      );
+
+      expect(config.useMitIdCustomUrl, isTrue);
+      expect(config.mitIdEffectiveIssuer, equals('https://test-login.abena.com'));
+    });
+
+    test('should have useMitIdCustomUrl false when neither mitIdAuthUrl nor mitIdIssuer set',
+        () {
+      final config = CidaasConfiguration(
+        clientId: 'classic-client-id',
+        issuer: 'https://issuer.cidaas.eu/',
+        redirectUri: 'app://test/callback',
+        postLogoutRedirectUri: 'app://test/logout',
+        discoveryUrl:
+            'https://issuer.cidaas.eu/.well-known/openid-configuration',
+        scopes: ['openid'],
+        cidaasClientIdMitID: 'mitid-client-id',
+      );
+
+      expect(config.useMitIdCustomUrl, isFalse);
+      expect(config.mitIdEffectiveIssuer, isNull);
+    });
+  });
 }

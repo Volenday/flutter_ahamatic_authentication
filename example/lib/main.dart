@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_ahamatic_authentication/flutter_ahamatic_authentication.dart';
 import 'package:flutter_ahamatic_authentication/cidaas/cidaas_web_auth.dart';
 import 'package:flutter_ahamatic_authentication/services/ahamatic_api_service.dart';
+import 'package:flutter_ahamatic_authentication/services/platform_service.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 
@@ -158,7 +159,8 @@ String _getDioErrorMessage(DioException error) {
 // CONFIGURATION
 // ============================================================================
 
-const environment = "sandbox";
+// Misma config que Bevilling (Reimbursment-App): production
+const environment = "production";
 String get apiURL {
   switch (environment) {
     case 'production':
@@ -178,50 +180,84 @@ const devAccount = {
   'password': 'V0l3nd@yP@ssw0rd',
 };
 
-/// Cidaas configuration based on platform
-final cidaasMobileConfig = CidaasConfiguration(
-  clientId: 'dd982451-c2bb-409f-9649-3ca12a9ba0fd',
-  issuer: 'https://abena-prod.cidaas.eu',
-  redirectUri: 'app://abenaRestock/oauth2redirect',
-  postLogoutRedirectUri: 'app://abenaRestock/logout',
-  discoveryUrl: 'https://abena-prod.cidaas.eu/.well-known/openid-configuration',
-  scopes: ['openid', 'profile', 'email', 'offline_access', 'dk-cpr'],
-);
+/// Bevilling Cidaas configuration (hardcoded para pruebas).
+CidaasConfiguration getBevillingCidaasConfig() {
+  const clientId = 'ee75cd84-4622-4e7e-8b50-c5bbd79576ac';
+  const clientIdMitID = '5fd6af67-1820-42f5-85fd-4dc236d00d65';
+  const issuer = 'https://test-login.abena.com';
+  const redirectUri = 'app://reimbursment/oauth2redirect';
+  const postLogoutUri = 'app://reimbursment/logout';
+  const mitIdAuthUrl =
+      'https://test-login.abena.com/authz-srv/authz?client_id=5fd6af67-1820-42f5-85fd-4dc236d00d65&redirect_uri=https%3A%2F%2Fwww.bevilling.dk%2FLogin%2FCallback&response_type=code&preferred_login=mitid';
 
-final cidaasWebConfig = CidaasConfiguration(
-  clientId: '88658db5-3737-45ac-b350-c6e8527ed190',
-  issuer: 'https://test-login.abena.com',
-  redirectUri: 'app://abenaRestock/oauth2redirect',
-  postLogoutRedirectUri: 'app://abenaRestock/logout',
-  discoveryUrl: 'https://test-login.abena.com/.well-known/openid-configuration',
-  scopes: ['openid', 'profile', 'email', 'offline_access'],
-  redirectWebUri: 'http://localhost:8080/callback',
-  postLogoutWebUri: 'http://localhost:8080/',
-);
+  return CidaasConfiguration(
+    clientId: clientId,
+    issuer: issuer,
+    redirectUri: redirectUri,
+    postLogoutRedirectUri: postLogoutUri,
+    discoveryUrl: '$issuer/.well-known/openid-configuration',
+    cidaasClientIdMitID: clientIdMitID,
+    mitIdAuthUrl: mitIdAuthUrl,
+    scopes: [
+      'openid',
+      'profile',
+      'email',
+      'phone',
+      'address',
+      'offline_access',
+      'identities',
+      'roles',
+      'groups',
+    ],
+  );
+}
 
-/// Gets the Cidaas configuration based on the platform
+/// Gets the Cidaas configuration (Bevilling). On web adds redirect URIs for browser.
 CidaasConfiguration getCidaasConfig() {
+  final config = getBevillingCidaasConfig();
   final isWeb = PlatformService.isWeb;
-  final config = isWeb ? cidaasWebConfig : cidaasMobileConfig;
+
+  final CidaasConfiguration effectiveConfig;
+  if (isWeb) {
+    const redirectWebUri = 'http://localhost:8080/callback';
+    const postLogoutWebUri = 'http://localhost:8080/';
+    effectiveConfig = CidaasConfiguration(
+      clientId: config.clientId,
+      issuer: config.issuer,
+      redirectUri: config.redirectUri,
+      postLogoutRedirectUri: config.postLogoutRedirectUri,
+      discoveryUrl: config.discoveryUrl,
+      scopes: config.scopes,
+      redirectWebUri: redirectWebUri,
+      postLogoutWebUri: postLogoutWebUri,
+      cidaasClientIdMitID: config.cidaasClientIdMitID,
+      mitIdAuthUrl: config.mitIdAuthUrl,
+    );
+  } else {
+    effectiveConfig = config;
+  }
 
   debugPrint('═══════════════════════════════════════════════════════');
   debugPrint('📱 CIDAAS CONFIG - Platform: ${isWeb ? "WEB" : "MOBILE"}');
   debugPrint('═══════════════════════════════════════════════════════');
-  debugPrint('  clientId: ${config.clientId}');
-  debugPrint('  issuer: ${config.issuer}');
-  debugPrint('  redirectUri: ${config.redirectUri}');
-  debugPrint('  postLogoutRedirectUri: ${config.postLogoutRedirectUri}');
-  debugPrint('  discoveryUrl: ${config.discoveryUrl}');
-  debugPrint('  scopes: ${config.scopes}');
-  if (config.redirectWebUri != null) {
-    debugPrint('  redirectWebUri: ${config.redirectWebUri}');
+  debugPrint('  clientId: ${effectiveConfig.clientId}');
+  debugPrint('  issuer: ${effectiveConfig.issuer}');
+  debugPrint('  redirectUri: ${effectiveConfig.redirectUri}');
+  debugPrint(
+      '  postLogoutRedirectUri: ${effectiveConfig.postLogoutRedirectUri}');
+  debugPrint('  discoveryUrl: ${effectiveConfig.discoveryUrl}');
+  debugPrint('  scopes: ${effectiveConfig.scopes}');
+  debugPrint('  cidaasClientIdMitID: ${effectiveConfig.cidaasClientIdMitID}');
+  debugPrint('  mitIdAuthUrl: ${effectiveConfig.mitIdAuthUrl ?? "(not set)"}');
+  if (effectiveConfig.redirectWebUri != null) {
+    debugPrint('  redirectWebUri: ${effectiveConfig.redirectWebUri}');
   }
-  if (config.postLogoutWebUri != null) {
-    debugPrint('  postLogoutWebUri: ${config.postLogoutWebUri}');
+  if (effectiveConfig.postLogoutWebUri != null) {
+    debugPrint('  postLogoutWebUri: ${effectiveConfig.postLogoutWebUri}');
   }
   debugPrint('═══════════════════════════════════════════════════════');
 
-  return config;
+  return effectiveConfig;
 }
 
 // Global authentication state
@@ -397,12 +433,12 @@ class _LoginPageState extends State<LoginPage> {
                 child: _useCustomButtons
                     ? _buildCustomButtonsExample(context)
                     : FlutterAhaAuthentication(
-                        moduleName: 'abenaRestock',
-                        moduleWebName: 'abenaRestock',
+                        moduleName: 'Reimbursment-App',
+                        moduleWebName: 'Reimbursment-App',
                         projectLogoAsset: 'assets/images/sample_logo.png',
                         applicationCode: 'abenadata',
-                        environment: 'development',
-                        europe: true,
+                        environment: 'production',
+                        europe: false,
                         cidaasConfiguration: getCidaasConfig(),
                         onAuthSuccess: _onAuthSuccess,
                         onAuthError: _onAuthError,
@@ -428,11 +464,11 @@ class _LoginPageState extends State<LoginPage> {
           // Widget with controller: registers callbacks, renders nothing
           FlutterAhaAuthentication(
             controller: _authController,
-            moduleName: 'abenaRestock',
-            moduleWebName: 'abenaRestock',
+            moduleName: 'Reimbursment-App',
+            moduleWebName: 'Reimbursment-App',
             applicationCode: 'abenadata',
-            environment: 'development',
-            europe: true,
+            environment: 'production',
+            europe: false,
             cidaasConfiguration: getCidaasConfig(),
             onAuthSuccess: _onAuthSuccess,
             onAuthError: _onAuthError,
@@ -452,10 +488,11 @@ class _LoginPageState extends State<LoginPage> {
             style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
           const SizedBox(height: 20),
+          // Log ind som borger = MitID (igual que Bevilling; OpenIAM no está habilitado en este módulo)
           SizedBox(
             width: MediaQuery.of(context).size.width,
             child: ElevatedButton(
-              onPressed: () => _authController.launchOpenIamLogin(),
+              onPressed: () => _authController.launchMitIdLogin(),
               style: ElevatedButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: Colors.green,
@@ -474,6 +511,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           const SizedBox(height: 12),
+          // Log in as commune = Cidaas classic
           SizedBox(
             width: MediaQuery.of(context).size.width,
             child: OutlinedButton(
@@ -485,11 +523,31 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               child: const Text(
-                'Log in with Cidaas',
+                'Log in with Cidaas (classic)',
                 style: TextStyle(fontSize: 14),
               ),
             ),
           ),
+          if (getCidaasConfig().cidaasClientIdMitID != null &&
+              getCidaasConfig().cidaasClientIdMitID!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: MediaQuery.of(context).size.width,
+              child: OutlinedButton(
+                onPressed: () => _authController.launchMitIdLogin(),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(40, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(3.0),
+                  ),
+                ),
+                child: const Text(
+                  'Log in with MitID',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -581,7 +639,7 @@ class _CallbackPageState extends State<CallbackPage>
           AhamaticApiServiceImpl(dio: dio, apiUrl: apiURL);
       final moduleConfig = await ahamaticApiService.getModuleConfig(
         'abenadata',
-        'abenaRestock',
+        'Reimbursment-App',
       );
       final apiKey = moduleConfig.apiKey ?? '';
       debugPrint(
@@ -596,7 +654,7 @@ class _CallbackPageState extends State<CallbackPage>
             '╠══════════════════════════════════════════════════════════════');
         debugPrint(
             '║ Could not retrieve the apiKey from module configuration.');
-        debugPrint('║ Module: abenadata / abenaRestock');
+        debugPrint('║ Module: abenadata / Reimbursment-App');
         debugPrint('║ Please verify that the module is properly configured.');
         debugPrint(
             '╚══════════════════════════════════════════════════════════════');

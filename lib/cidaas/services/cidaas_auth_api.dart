@@ -9,9 +9,15 @@ abstract interface class CidaasAuthApi {
   ///
   /// [apiKey] - The API key for Ahamatic authentication
   /// [apiUrl] - The base URL of the Ahamatic API
+  /// [clientIdOverride] - Optional client ID to use instead of config's effective client ID
+  ///   (e.g. [CidaasConfiguration.clientId] for classic, [CidaasConfiguration.cidaasClientIdMitID] for MitID).
   ///
   /// Returns a [TokenResponse] containing the authentication tokens.
-  Future<TokenResponse> signInWithCidaas(String apiKey, String apiUrl);
+  Future<TokenResponse> signInWithCidaas(
+    String apiKey,
+    String apiUrl, {
+    String? clientIdOverride,
+  });
 
   /// Signs out the user from Cidaas.
   ///
