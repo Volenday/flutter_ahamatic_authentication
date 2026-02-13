@@ -621,6 +621,9 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     String? receivedState;
     final navigator = Navigator.of(context);
 
+    // iOS: WKWebView can reload or reflow when the keyboard appears (view insets change).
+    // Using resizeToAvoidBottomInset: false avoids resizing the WebView when the keyboard
+    // is shown, which can reduce or prevent the unwanted reload on text field focus.
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -631,43 +634,40 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
           child: SizedBox(
             width: MediaQuery.of(dialogContext).size.width * 0.9,
             height: MediaQuery.of(dialogContext).size.height * 0.85,
-            child: Column(
-              children: [
-                AppBar(
-                  title: const Text('MitID Login'),
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => navigator.pop(),
-                  ),
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              appBar: AppBar(
+                title: const Text('MitID Login'),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => navigator.pop(),
                 ),
-                Expanded(
-                  child: WebViewWidget(
-                    controller: WebViewController()
-                      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                      ..setNavigationDelegate(
-                        NavigationDelegate(
-                          onNavigationRequest: (request) {
-                            final uri = Uri.parse(request.url);
-                            if (uri.toString().startsWith(config.redirectUri) &&
-                                uri.queryParameters.containsKey('code') &&
-                                uri.queryParameters.containsKey('state')) {
-                              receivedCode = uri.queryParameters['code'];
-                              receivedState = uri.queryParameters['state'];
-                              navigator.pop();
-                              return NavigationDecision.prevent;
-                            }
-                            if (uri.queryParameters.containsKey('error')) {
-                              navigator.pop();
-                              return NavigationDecision.prevent;
-                            }
-                            return NavigationDecision.navigate;
-                          },
-                        ),
-                      )
-                      ..loadRequest(authUrl),
-                  ),
-                ),
-              ],
+              ),
+              body: WebViewWidget(
+                controller: WebViewController()
+                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                  ..setNavigationDelegate(
+                    NavigationDelegate(
+                      onNavigationRequest: (request) {
+                        final uri = Uri.parse(request.url);
+                        if (uri.toString().startsWith(config.redirectUri) &&
+                            uri.queryParameters.containsKey('code') &&
+                            uri.queryParameters.containsKey('state')) {
+                          receivedCode = uri.queryParameters['code'];
+                          receivedState = uri.queryParameters['state'];
+                          navigator.pop();
+                          return NavigationDecision.prevent;
+                        }
+                        if (uri.queryParameters.containsKey('error')) {
+                          navigator.pop();
+                          return NavigationDecision.prevent;
+                        }
+                        return NavigationDecision.navigate;
+                      },
+                    ),
+                  )
+                  ..loadRequest(authUrl),
+              ),
             ),
           ),
         ),

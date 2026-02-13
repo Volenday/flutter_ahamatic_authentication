@@ -159,7 +159,7 @@ String _getDioErrorMessage(DioException error) {
 // CONFIGURATION
 // ============================================================================
 
-// Misma config que Bevilling (Reimbursment-App): production
+// Same config as Bevilling (Reimbursement-App): production
 const environment = "production";
 String get apiURL {
   switch (environment) {
@@ -180,7 +180,7 @@ const devAccount = {
   'password': 'V0l3nd@yP@ssw0rd',
 };
 
-/// Bevilling Cidaas configuration (hardcoded para pruebas).
+/// Bevilling Cidaas configuration (hardcoded for testing).
 CidaasConfiguration getBevillingCidaasConfig() {
   const clientId = 'ee75cd84-4622-4e7e-8b50-c5bbd79576ac';
   const clientIdMitID = '5fd6af67-1820-42f5-85fd-4dc236d00d65';
@@ -488,7 +488,7 @@ class _LoginPageState extends State<LoginPage> {
             style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
           const SizedBox(height: 20),
-          // Log ind som borger = MitID (igual que Bevilling; OpenIAM no está habilitado en este módulo)
+          // Log in as citizen = MitID (same as Bevilling; OpenIAM is not enabled in this module)
           SizedBox(
             width: MediaQuery.of(context).size.width,
             child: ElevatedButton(
@@ -502,7 +502,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               child: const Text(
-                'Log ind som borger',
+                'Log in as citizen',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.normal,
