@@ -56,7 +56,7 @@ class FlutterAhamaticAuthenticationPlugin : FlutterPlugin, MethodCallHandler, Ac
         redirectReceived = true
         pendingMitIdResult?.success(url)
         pendingMitIdResult = null
-        mitIdActivity?.lifecycle?.removeObserver(mitIdResumeObserver)
+        (mitIdActivity as? LifecycleOwner)?.lifecycle?.removeObserver(mitIdResumeObserver)
         mitIdActivity = null
       }
     }
@@ -136,7 +136,7 @@ class FlutterAhamaticAuthenticationPlugin : FlutterPlugin, MethodCallHandler, Ac
     redirectReceived = false
     pendingMitIdResult = result
     mitIdActivity = currentActivity
-    currentActivity.lifecycle.addObserver(mitIdResumeObserver)
+    (currentActivity as? LifecycleOwner)?.lifecycle?.addObserver(mitIdResumeObserver)
 
     try {
       val customTabsIntent = CustomTabsIntent.Builder()
@@ -146,7 +146,7 @@ class FlutterAhamaticAuthenticationPlugin : FlutterPlugin, MethodCallHandler, Ac
       customTabsIntent.launchUrl(currentActivity, uri)
     } catch (e: Exception) {
       pendingMitIdResult = null
-      mitIdActivity?.lifecycle?.removeObserver(mitIdResumeObserver)
+      (mitIdActivity as? LifecycleOwner)?.lifecycle?.removeObserver(mitIdResumeObserver)
       mitIdActivity = null
       result.error("LAUNCH_FAILED", "Failed to launch Custom Tab: ${e.message}", null)
     }
