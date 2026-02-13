@@ -619,60 +619,90 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     if (!mounted || !context.mounted) return;
     String? receivedCode;
     String? receivedState;
-    final navigator = Navigator.of(context);
 
-    // iOS: WKWebView can reload or reflow when the keyboard appears (view insets change).
-    // Using resizeToAvoidBottomInset: false avoids resizing the WebView when the keyboard
-    // is shown, which can reduce or prevent the unwanted reload on text field focus.
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: MediaQuery.of(dialogContext).size.width * 0.9,
-            height: MediaQuery.of(dialogContext).size.height * 0.85,
-            child: Scaffold(
-              resizeToAvoidBottomInset: false,
-              appBar: AppBar(
-                title: const Text('MitID Login'),
-                leading: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => navigator.pop(),
+    // iOS: Use ASWebAuthenticationSession to avoid WKWebView keyboard reload issue.
+    // Android: Use in-app WebView dialog.
+    if (PlatformService.isIOS) {
+      final scheme = Uri.parse(config.redirectUri).scheme;
+      if (scheme.isEmpty) {
+        widget.onAuthError?.call('Redirect URI must use a custom scheme (e.g. app://...) for MitID on iOS.');
+        return;
+      }
+      try {
+        const channel = MethodChannel('flutter_ahamatic_authentication');
+        final callbackUrl = await channel.invokeMethod<String>(
+          'launchMitIdAuth',
+          <String, dynamic>{
+            'authUrl': authUrl.toString(),
+            'callbackUrlScheme': scheme,
+          },
+        );
+        if (callbackUrl != null && callbackUrl.isNotEmpty) {
+          final uri = Uri.parse(callbackUrl);
+          receivedCode = uri.queryParameters['code'];
+          receivedState = uri.queryParameters['state'];
+        }
+      } on PlatformException catch (e) {
+        if (e.code == 'CANCELED') {
+          debugPrint(
+              'FlutterAhaAuthentication: [INFO] MitID (iOS) canceled by user');
+          return;
+        }
+        widget.onAuthError?.call(e.message ?? 'MitID authentication failed.');
+        return;
+      }
+    } else {
+      final navigator = Navigator.of(context);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: MediaQuery.of(dialogContext).size.width * 0.9,
+              height: MediaQuery.of(dialogContext).size.height * 0.85,
+              child: Scaffold(
+                resizeToAvoidBottomInset: false,
+                appBar: AppBar(
+                  title: const Text('MitID Login'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => navigator.pop(),
+                  ),
                 ),
-              ),
-              body: WebViewWidget(
-                controller: WebViewController()
-                  ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                  ..setNavigationDelegate(
-                    NavigationDelegate(
-                      onNavigationRequest: (request) {
-                        final uri = Uri.parse(request.url);
-                        if (uri.toString().startsWith(config.redirectUri) &&
-                            uri.queryParameters.containsKey('code') &&
-                            uri.queryParameters.containsKey('state')) {
-                          receivedCode = uri.queryParameters['code'];
-                          receivedState = uri.queryParameters['state'];
-                          navigator.pop();
-                          return NavigationDecision.prevent;
-                        }
-                        if (uri.queryParameters.containsKey('error')) {
-                          navigator.pop();
-                          return NavigationDecision.prevent;
-                        }
-                        return NavigationDecision.navigate;
-                      },
-                    ),
-                  )
-                  ..loadRequest(authUrl),
+                body: WebViewWidget(
+                  controller: WebViewController()
+                    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                    ..setNavigationDelegate(
+                      NavigationDelegate(
+                        onNavigationRequest: (request) {
+                          final uri = Uri.parse(request.url);
+                          if (uri.toString().startsWith(config.redirectUri) &&
+                              uri.queryParameters.containsKey('code') &&
+                              uri.queryParameters.containsKey('state')) {
+                            receivedCode = uri.queryParameters['code'];
+                            receivedState = uri.queryParameters['state'];
+                            navigator.pop();
+                            return NavigationDecision.prevent;
+                          }
+                          if (uri.queryParameters.containsKey('error')) {
+                            navigator.pop();
+                            return NavigationDecision.prevent;
+                          }
+                          return NavigationDecision.navigate;
+                        },
+                      ),
+                    )
+                    ..loadRequest(authUrl),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
 
     if (receivedCode == null || receivedState == null) {
       debugPrint(
