@@ -37,7 +37,7 @@ void main() {
       });
 
       test('should handle app name with special characters', () async {
-        const expectedName = 'Test App™ - Ñoño & More (2024)';
+        const expectedName = 'Test App™ - Nonyo & More (2024)';
         dioAdapter.onGet(
           RegExp(r'/api/validate/app'),
           (server) => server.reply(200, {

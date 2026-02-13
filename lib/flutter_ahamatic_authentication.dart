@@ -529,6 +529,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         final isMitIdFlow = config.cidaasClientIdMitID?.trim().isNotEmpty == true &&
             clientId == config.cidaasClientIdMitID?.trim();
         final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
+        // Native browser (ASWebAuthenticationSession / Custom Tabs) only for MitID custom URL.
         if (isMitIdFlow && mitIdAuthUrl != null && mitIdAuthUrl.isNotEmpty) {
           debugPrint(
               'FlutterAhaAuthentication: [DEBUG] starting MitID mobile flow (full URL)');
@@ -580,9 +581,11 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     // Note: The flow continues when the user returns to the callback URL.
   }
 
-  /// Launches MitID login on mobile using the full [mitIdAuthUrl].
-  /// Opens the URL in a WebView with PKCE and app redirect_uri; intercepts
-  /// the callback and exchanges the code for tokens.
+  /// Launches MitID login on mobile using the full [mitIdAuthUrl] (custom URL flow only).
+  /// This is only used when [CidaasConfiguration.mitIdAuthUrl] is set; MitID without
+  /// custom URL uses [_launchCidaasLoginMobile] (AppAuth) instead.
+  /// On iOS uses ASWebAuthenticationSession; on Android uses Chrome Custom Tabs;
+  /// both avoid in-app WebView keyboard reload on physical devices.
   Future<void> _launchMitIdLoginMobileWithFullUrl(
       CidaasConfiguration config, String clientId) async {
     final mitIdAuthUrl = config.mitIdAuthUrl?.trim();
@@ -620,12 +623,12 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
     String? receivedCode;
     String? receivedState;
 
-    // iOS: Use ASWebAuthenticationSession to avoid WKWebView keyboard reload issue.
-    // Android: Use in-app WebView dialog.
-    if (PlatformService.isIOS) {
+    // Custom URL flow only: iOS = ASWebAuthenticationSession, Android = Chrome Custom Tabs.
+    if (PlatformService.isIOS || PlatformService.isAndroid) {
       final scheme = Uri.parse(config.redirectUri).scheme;
       if (scheme.isEmpty) {
-        widget.onAuthError?.call('Redirect URI must use a custom scheme (e.g. app://...) for MitID on iOS.');
+        widget.onAuthError?.call(
+            'Redirect URI must use a custom scheme (e.g. app://...) for MitID on mobile.');
         return;
       }
       try {
@@ -645,7 +648,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
       } on PlatformException catch (e) {
         if (e.code == 'CANCELED') {
           debugPrint(
-              'FlutterAhaAuthentication: [INFO] MitID (iOS) canceled by user');
+              'FlutterAhaAuthentication: [INFO] MitID (mobile) canceled by user');
           return;
         }
         widget.onAuthError?.call(e.message ?? 'MitID authentication failed.');

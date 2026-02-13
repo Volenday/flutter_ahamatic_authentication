@@ -136,6 +136,45 @@ android {
 }
 ```
 
+#### MitID on Android (Chrome Custom Tabs)
+
+On Android, MitID uses **Chrome Custom Tabs** (not an in-app WebView) to avoid keyboard reload issues on physical devices. You must:
+
+1. **Add an intent-filter** for your OAuth redirect URI in `AndroidManifest.xml` (inside your main `<activity>`):
+
+```xml
+<intent-filter>
+    <action android:name="android.intent.action.VIEW"/>
+    <category android:name="android.intent.category.DEFAULT"/>
+    <category android:name="android.intent.category.BROWSABLE"/>
+    <data android:scheme="app" android:host="yourHost" android:pathPrefix="/oauth2redirect"/>
+</intent-filter>
+```
+
+Use the same `scheme`, `host`, and path as in your `redirectUri` (e.g. `app://yourHost/oauth2redirect`).
+
+2. **Call `deliverRedirectUri`** from your `MainActivity` when the app receives the redirect (so the plugin can complete the login):
+
+**Kotlin** (`MainActivity.kt`):
+
+```kotlin
+import com.volenday.flutter_ahamatic_authentication.FlutterAhamaticAuthenticationPlugin
+
+override fun onNewIntent(intent: Intent) {
+  super.onNewIntent(intent)
+  intent.data?.toString()?.takeIf { it.startsWith("app://") }?.let { url ->
+    FlutterAhamaticAuthenticationPlugin.deliverRedirectUri(url)
+  }
+}
+
+override fun onCreate(savedInstanceState: Bundle?) {
+  super.onCreate(savedInstanceState)
+  intent?.data?.toString()?.takeIf { it.startsWith("app://") }?.let { url ->
+    FlutterAhamaticAuthenticationPlugin.deliverRedirectUri(url)
+  }
+}
+```
+
 ---
 
 ## 🌐 Web Configuration
