@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   intl: ^0.20.2
   url_launcher: ^6.1.12
   dio: ^5.8.0+1
@@ -20,11 +22,17 @@ dependencies:
   fluttertoast: ^8.2.8
   jwt_decoder: ^2.0.1
   device_info_plus: ^11.5.0
+  flutter_appauth: ^9.0.1
+  crypto: ^3.0.3
+  flutter_svg: ^2.0.10+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.8
+  http_mock_adapter: ^0.6.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -48,9 +56,13 @@ flutter:
         pluginClass: FlutterAhamaticAuthenticationPlugin
       ios:
         pluginClass: FlutterAhamaticAuthenticationPlugin
+      web:
+        pluginClass: FlutterAhamaticAuthenticationWeb
+        fileName: flutter_ahamatic_authentication_web.dart
 
-  # assets:
-  #   - assets/images/
+  assets:
+    - assets/cidaas/cidaas_logo.png
+    - assets/openiam/abena_logo.png
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:
