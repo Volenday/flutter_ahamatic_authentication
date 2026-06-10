@@ -61,6 +61,7 @@ flutter:
         fileName: flutter_ahamatic_authentication_web.dart
 
   assets:
+    - assets/abena/abena_logo.png
     - assets/cidaas/cidaas_logo.png
     - assets/openiam/abena_logo.png
 
