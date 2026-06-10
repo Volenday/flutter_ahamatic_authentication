@@ -919,7 +919,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isCidaasEnabled)
           _SignInAlternatives(
             name: cidaasButtonName,
-            logo: _abenaLogoAsset,
+            logo: _openIamLogo,
             isAsset: true,
             onPressed: _launchCidaasLogin,
             // Show highlight effect after first attempt on iOS
@@ -928,7 +928,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isCidaasEnabled && hasMitId)
           _SignInAlternatives(
             name: 'MitID',
-            logo: _abenaLogoAsset,
+            logo: _openIamLogo,
             isAsset: true,
             onPressed: _launchMitIdLogin,
           ),
