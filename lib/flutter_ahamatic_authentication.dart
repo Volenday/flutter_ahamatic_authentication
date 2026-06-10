@@ -37,6 +37,9 @@ export 'package:flutter_ahamatic_authentication/widgets/oauth_callback_handler.d
 /// Cidaas logo asset path (local asset to avoid CORS issues)
 const _cidaasLogoAsset = 'assets/cidaas/cidaas_logo.png';
 
+/// Abena logo asset path (local asset to avoid CORS issues)
+const _abenaLogoAsset = 'assets/abena/abena_logo.png';
+
 /// OpenIAM/Abena ID logo asset path (local fallback)
 const _openIamLogoAsset = 'assets/openiam/abena_logo.png';
 
@@ -899,7 +902,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         '🔘 Button state - isIOS: ${PlatformService.isIOS}, firstAttemptDone: $_cidaasFirstAttemptDone');
     final cidaasButtonName = (PlatformService.isIOS && _cidaasFirstAttemptDone)
         ? 'Continue'
-        : 'Cidaas';
+        : 'log ind';
     debugPrint('🔘 Button name: $cidaasButtonName');
 
     final config = widget.cidaasConfiguration;
@@ -916,7 +919,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isCidaasEnabled)
           _SignInAlternatives(
             name: cidaasButtonName,
-            logo: _cidaasLogoAsset,
+            logo: _abenaLogoAsset,
             isAsset: true,
             onPressed: _launchCidaasLogin,
             // Show highlight effect after first attempt on iOS
@@ -925,7 +928,7 @@ class _FlutterAhaAuthenticationState extends State<FlutterAhaAuthentication> {
         if (_isCidaasEnabled && hasMitId)
           _SignInAlternatives(
             name: 'MitID',
-            logo: _cidaasLogoAsset,
+            logo: _abenaLogoAsset,
             isAsset: true,
             onPressed: _launchMitIdLogin,
           ),
