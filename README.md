@@ -31,11 +31,11 @@ A Flutter plugin that provides a seamless authentication interface for Ahamatic-
 | iOS (CocoaPods) | iOS 12.0+ | Default Flutter iOS setup |
 | iOS (Swift Package Manager) | Flutter **≥ 3.41** in the app with SPM enabled | [SPM for app developers](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers) |
 
-### Upgrading consumer apps (0.0.3+)
+### Upgrading consumer apps (0.0.4+)
 
-1. Update the dependency: `flutter_ahamatic_authentication: ^0.0.3`
+1. Update the dependency: `flutter_ahamatic_authentication: ^0.0.4`
 2. Run `flutter pub upgrade` and rebuild.
-3. **Android:** After upgrade, `flutter_ahamatic_authentication` should no longer appear in the Built-in Kotlin / KGP plugin warning. Other plugins (e.g. `fluttertoast`, `device_info_plus`) must be updated separately by their maintainers.
+3. **Android:** After upgrade, `flutter_ahamatic_authentication` should no longer appear in the Built-in Kotlin / KGP plugin warning. The unused `fluttertoast` dependency was removed in 0.0.4, and `webview_flutter`/`webview_flutter_android` now resolve to a Built-in Kotlin–compatible version. `device_info_plus` (a real dependency of this plugin) still applies the Kotlin Gradle Plugin upstream as of its latest release, so it will keep showing up in the warning until its maintainers migrate — this is outside our control.
 4. **iOS:** With `flutter config --enable-swift-package-manager`, this plugin should no longer appear in the SPM unsupported-plugins warning. Third-party plugins without SPM may still be listed until they migrate or you disable SPM.
 
 ---

@@ -1,6 +1,6 @@
 name: flutter_ahamatic_authentication
 description: A new Flutter plugin project.
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/Volenday/flutter_ahamatic_authentication.git
 
 environment:
@@ -19,7 +19,6 @@ dependencies:
   webview_flutter: ^4.13.0
   collection: ^1.19.1
   universal_html: ^2.2.4
-  fluttertoast: ^8.2.8
   jwt_decoder: ^2.0.1
   device_info_plus: ^11.5.0
   flutter_appauth: ^9.0.1
